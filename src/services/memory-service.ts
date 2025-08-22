@@ -1,0 +1,367 @@
+import Database from 'better-sqlite3';
+import { createHash } from 'crypto';
+import { debugLog } from '../utils/debug.js';
+
+export interface MemoryEntry {
+  id: number;
+  content: string;
+  tags: string[];
+  createdAt: string;
+  hash: string;
+}
+
+export interface MemoryRelationship {
+  fromMemoryId: number;
+  toMemoryId: number;
+  relationshipType: string;
+  createdAt: string;
+}
+
+export interface MemoryStats {
+  totalMemories: number;
+  totalRelationships: number;
+  dbSize: number;
+  dbPath: string;
+  resolvedPath: string;
+}
+
+/**
+ * Memory Service for persistent storage and retrieval of memories with tagging and relationships.
+ * Based on SQLite with FTS (Full Text Search) for efficient querying.
+ */
+export class MemoryService {
+  private db: Database.Database | null = null;
+  private dbPath: string;
+  private stmts!: Record<string, Database.Statement>;
+  private maxContentSize: number = 1024 * 1024; // 1MB default
+
+  constructor(dbPath: string = 'memory.db', maxContentSize?: number) {
+    this.dbPath = dbPath;
+    if (maxContentSize) this.maxContentSize = maxContentSize;
+  }
+
+  async initialize(): Promise<void> {
+    try {
+      this.db = new Database(this.dbPath);
+      this.initDb();
+      debugLog('MemoryService initialized with database:', this.dbPath);
+    } catch (error: any) {
+      throw new Error(`Failed to initialize database: ${error.message}`);
+    }
+  }
+
+  private initDb(): void {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+    
+    // Enable WAL mode for better concurrency and performance
+    this.db.pragma('journal_mode = WAL');
+    this.db.pragma('synchronous = NORMAL');
+    
+    // Create memories table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS memories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        content TEXT NOT NULL,
+        tags TEXT,
+        created_at TEXT,
+        hash TEXT UNIQUE
+      )
+    `);
+
+    // Create relationships table for linking memories
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS relationships (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        from_memory_id INTEGER,
+        to_memory_id INTEGER,
+        relationship_type TEXT DEFAULT 'related',
+        created_at TEXT,
+        FOREIGN KEY (from_memory_id) REFERENCES memories (id) ON DELETE CASCADE,
+        FOREIGN KEY (to_memory_id) REFERENCES memories (id) ON DELETE CASCADE,
+        UNIQUE(from_memory_id, to_memory_id, relationship_type)
+      )
+    `);
+
+    // Create FTS table for fast text search
+    this.db.exec(`
+      CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts 
+      USING fts5(content, tags, content='memories', content_rowid='id')
+    `);
+
+    // Create trigger to automatically update FTS when memories are inserted
+    this.db.exec(`
+      CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON memories BEGIN
+        INSERT INTO memories_fts (rowid, content, tags) 
+        VALUES (new.id, new.content, new.tags);
+      END;
+    `);
+
+    // Create trigger to automatically update FTS when memories are updated
+    this.db.exec(`
+      CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON memories BEGIN
+        UPDATE memories_fts SET content = new.content, tags = new.tags 
+        WHERE rowid = new.id;
+      END;
+    `);
+
+    // Create trigger to automatically delete from FTS when memories are deleted
+    this.db.exec(`
+      CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON memories BEGIN
+        DELETE FROM memories_fts WHERE rowid = old.id;
+      END;
+    `);
+
+    // Prepare statements for better performance
+    this.stmts = {
+      insert: this.db!.prepare(`
+        INSERT INTO memories (content, tags, created_at, hash) 
+        VALUES (?, ?, ?, ?)
+      `),
+      insertRelationship: this.db!.prepare(`
+        INSERT INTO relationships (from_memory_id, to_memory_id, relationship_type, created_at)
+        VALUES (?, ?, ?, ?)
+      `),
+      searchText: this.db!.prepare(`
+        SELECT m.* FROM memories m
+        JOIN memories_fts fts ON m.id = fts.rowid
+        WHERE memories_fts MATCH ?
+        ORDER BY m.created_at DESC
+        LIMIT ?
+      `),
+      searchTags: this.db!.prepare(`
+        SELECT * FROM memories 
+        WHERE tags LIKE ?
+        ORDER BY created_at DESC
+        LIMIT ?
+      `),
+      getRecent: this.db!.prepare(`
+        SELECT * FROM memories 
+        ORDER BY created_at DESC
+        LIMIT ?
+      `),
+      getMemoryById: this.db!.prepare(`
+        SELECT * FROM memories WHERE id = ?
+      `),
+      getMemoryByHash: this.db!.prepare(`
+        SELECT * FROM memories WHERE hash = ?
+      `),
+      getRelated: this.db!.prepare(`
+        SELECT m.*, r.relationship_type 
+        FROM memories m
+        JOIN relationships r ON (m.id = r.to_memory_id OR m.id = r.from_memory_id)
+        WHERE (r.from_memory_id = ? OR r.to_memory_id = ?) AND m.id != ?
+        ORDER BY r.created_at DESC
+        LIMIT ?
+      `),
+      deleteByHash: this.db!.prepare(`
+        DELETE FROM memories WHERE hash = ?
+      `),
+      deleteByTag: this.db!.prepare(`
+        DELETE FROM memories WHERE tags LIKE ?
+      `),
+      getStats: this.db!.prepare(`
+        SELECT COUNT(*) as count FROM memories
+      `),
+      getRelationshipStats: this.db!.prepare(`
+        SELECT COUNT(*) as count FROM relationships
+      `)
+    };
+  }
+
+  /**
+   * Store a memory with optional tags
+   */
+  store(content: string, tags: string[] = []): string {
+    // Validate content size
+    if (content.length > this.maxContentSize) {
+      throw new Error(`Content exceeds maximum size of ${this.maxContentSize} characters`);
+    }
+
+    const hash = createHash('md5').update(content).digest('hex');
+    const tagsStr = tags.join(',');
+    const createdAt = new Date().toISOString();
+
+    try {
+      if (!this.db) {
+        throw new Error('Database not initialized');
+      }
+      
+      // Insert only into main table, FTS will be updated by trigger
+      this.stmts.insert.run(content, tagsStr, createdAt, hash);
+      
+      debugLog('MemoryService: Stored memory with hash:', hash.substring(0, 8) + '...');
+      return hash;
+    } catch (error: any) {
+      if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        debugLog('MemoryService: Memory already exists with hash:', hash.substring(0, 8) + '...');
+        return hash; // Already exists
+      }
+      debugLog('MemoryService: Error storing memory:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Search memories by content or tags
+   */
+  search(query?: string, tags?: string[], limit: number = 10): MemoryEntry[] {
+    let results: any[];
+
+    if (query) {
+      // Use FTS for text search
+      results = this.stmts.searchText.all(query, limit);
+    } else if (tags && tags.length > 0) {
+      // Simple tag search (could be improved with proper tag normalization)
+      const tagPattern = `%${tags[0]}%`;
+      results = this.stmts.searchTags.all(tagPattern, limit);
+    } else {
+      // Get recent memories
+      results = this.stmts.getRecent.all(limit);
+    }
+
+    const memories = results.map(row => ({
+      id: row.id,
+      content: row.content,
+      tags: row.tags ? row.tags.split(',') : [],
+      createdAt: row.created_at,
+      hash: row.hash
+    }));
+
+    debugLog('MemoryService: Search returned', memories.length, 'results');
+    return memories;
+  }
+
+  /**
+   * Delete a memory by hash
+   */
+  delete(hash: string): boolean {
+    const result = this.stmts.deleteByHash.run(hash);
+    const deleted = result.changes > 0;
+    debugLog('MemoryService: Delete by hash', hash.substring(0, 8) + '...', deleted ? 'success' : 'not found');
+    return deleted;
+  }
+
+  /**
+   * Delete memories by tag
+   */
+  deleteByTag(tag: string): number {
+    const result = this.stmts.deleteByTag.run(`%${tag}%`);
+    debugLog('MemoryService: Deleted', result.changes, 'memories with tag:', tag);
+    return result.changes;
+  }
+
+  /**
+   * Link two memories with a relationship
+   */
+  linkMemories(fromHash: string, toHash: string, relationshipType: string = 'related'): boolean {
+    const fromMemory = this.stmts.getMemoryByHash.get(fromHash) as any;
+    const toMemory = this.stmts.getMemoryByHash.get(toHash) as any;
+    
+    if (!fromMemory || !toMemory) {
+      throw new Error('One or both memories not found');
+    }
+    
+    const createdAt = new Date().toISOString();
+    
+    try {
+      this.stmts.insertRelationship.run(
+        fromMemory.id, 
+        toMemory.id, 
+        relationshipType, 
+        createdAt
+      );
+      debugLog('MemoryService: Linked memories:', fromHash.substring(0, 8) + '...', 'to', toHash.substring(0, 8) + '...');
+      return true;
+    } catch (error: any) {
+      if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        debugLog('MemoryService: Relationship already exists');
+        return false; // Relationship already exists
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Get memories related to a specific memory
+   */
+  getRelated(hash: string, limit: number = 10): MemoryEntry[] {
+    const memory = this.stmts.getMemoryByHash.get(hash) as any;
+    if (!memory) {
+      debugLog('MemoryService: Memory not found for getRelated:', hash.substring(0, 8) + '...');
+      return [];
+    }
+
+    const results = this.stmts.getRelated.all(memory.id, memory.id, memory.id, limit) as any[];
+    
+    const related = results.map((row: any) => ({
+      id: row.id,
+      content: row.content,
+      tags: row.tags ? row.tags.split(',') : [],
+      createdAt: row.created_at,
+      hash: row.hash,
+      relationshipType: row.relationship_type
+    }));
+
+    debugLog('MemoryService: Found', related.length, 'related memories');
+    return related;
+  }
+
+  /**
+   * Get statistics about the memory database
+   */
+  async stats(): Promise<MemoryStats> {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+    
+    const memoryCount = this.stmts.getStats.get() as any;
+    const relationshipCount = this.stmts.getRelationshipStats.get() as any;
+    
+    // Get path information
+    const path = await import('path');
+    const resolvedPath = path.resolve(this.dbPath);
+    
+    const stats = {
+      totalMemories: memoryCount.count,
+      totalRelationships: relationshipCount.count,
+      dbSize: (this.db.prepare("PRAGMA page_size").get() as any)['page_size'] * 
+             (this.db.prepare("PRAGMA page_count").get() as any)['page_count'],
+      dbPath: this.dbPath,
+      resolvedPath: resolvedPath
+    };
+
+    debugLog('MemoryService: Stats:', stats);
+    return stats;
+  }
+
+  /**
+   * Get memory by hash
+   */
+  getByHash(hash: string): MemoryEntry | null {
+    const result = this.stmts.getMemoryByHash.get(hash) as any;
+    if (!result) {
+      return null;
+    }
+
+    return {
+      id: result.id,
+      content: result.content,
+      tags: result.tags ? result.tags.split(',') : [],
+      createdAt: result.created_at,
+      hash: result.hash
+    };
+  }
+
+  /**
+   * Close the database connection
+   */
+  async close(): Promise<void> {
+    if (this.db) {
+      this.db.close();
+      this.db = null;
+      debugLog('MemoryService: Database connection closed');
+    }
+  }
+}
