@@ -12,7 +12,7 @@ export interface ParsedArgs {
  */
 export function parseCommandLineArgs(args: string[]): ParsedArgs {
     const parsed: ParsedArgs = {};
-    let i = 1; // Skip command name
+    let i = 0; // Start from index 0 since args are already filtered
 
     while (i < args.length) {
         const arg = args[i];
