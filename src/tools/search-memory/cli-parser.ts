@@ -13,7 +13,9 @@ export function parseCliArgs(args: string[]) {
   if (rawArgs.query) result.query = rawArgs.query;
   if (rawArgs.tags) result.tags = (rawArgs.tags as string).split(',').map((tag: string) => tag.trim());
   if (rawArgs.limit) result.limit = parseInt(rawArgs.limit as string);
-  if (rawArgs.includeRelated) result.includeRelated = true;
+  if (rawArgs.includeRelated) {
+    result.includeRelated = rawArgs.includeRelated === 'true' || rawArgs.includeRelated === true;
+  }
   if (rawArgs.depth) {
     const depth = parseInt(rawArgs.depth as string);
     result.relationshipDepth = Math.min(Math.max(depth, 1), 3); // Clamp between 1-3
