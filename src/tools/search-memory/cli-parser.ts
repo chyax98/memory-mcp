@@ -14,7 +14,7 @@ export function parseCliArgs(args: string[]) {
   if (rawArgs.tags) result.tags = (rawArgs.tags as string).split(',').map((tag: string) => tag.trim());
   if (rawArgs.limit) result.limit = parseInt(rawArgs.limit as string);
   if (rawArgs.includeRelated) {
-    result.includeRelated = rawArgs.includeRelated === 'true' || rawArgs.includeRelated === true;
+    result.includeRelated = Boolean(rawArgs.includeRelated);
   }
   if (rawArgs.depth) {
     const depth = parseInt(rawArgs.depth as string);
