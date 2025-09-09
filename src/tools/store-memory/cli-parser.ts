@@ -11,7 +11,7 @@ export function parseCliArgs(args: string[]) {
   
   if (rawArgs.content) result.content = rawArgs.content;
   if (rawArgs.tags) result.tags = (rawArgs.tags as string).split(',').map((tag: string) => tag.trim());
-  if (rawArgs.autoLink) {
+  if (typeof rawArgs.autoLink !== 'undefined') {
       result.autoLink = Boolean(rawArgs.autoLink);
   }
   if (rawArgs.relateTo) result.relateTo = (rawArgs.relateTo as string).split(',').map((tag: string) => tag.trim());
