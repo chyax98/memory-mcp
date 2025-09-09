@@ -11,7 +11,17 @@ export function parseCliArgs(args: string[]) {
   
   if (rawArgs.content) result.content = rawArgs.content;
   if (rawArgs.tags) result.tags = (rawArgs.tags as string).split(',').map((tag: string) => tag.trim());
-  if (rawArgs.autoLink !== undefined) result.autoLink = !!rawArgs.autoLink;
+  if (rawArgs.autoLink !== undefined) {
+    // Accept 'false', '0', 'no' (case-insensitive) as false, otherwise true
+    if (
+      typeof rawArgs.autoLink === 'string' &&
+      ['false', '0', 'no'].includes(rawArgs.autoLink.toLowerCase())
+    ) {
+      result.autoLink = false;
+    } else {
+      result.autoLink = Boolean(rawArgs.autoLink);
+    }
+  }
   if (rawArgs.relateTo) result.relateTo = (rawArgs.relateTo as string).split(',').map((tag: string) => tag.trim());
   
   return result;
