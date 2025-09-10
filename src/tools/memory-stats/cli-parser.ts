@@ -1,22 +1,10 @@
+import { parseCommandLineArgs } from '../../utils/cli-parser.js';
+
 export function parseCliArgs(args: string[]) {
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    
-    if (arg === '--help') {
-      console.log(`
-Usage: memory-stats
+  // PHASE 1: Convert string array to object (shared utility)
+  const rawArgs = parseCommandLineArgs(args);
 
-Shows statistics about stored memories including:
-- Total number of memories
-- Total number of relationships
-- Database size
-
-Examples:
-  memory-stats
-`);
-      process.exit(0);
-    }
-  }
+  // PHASE 2: Validate and transform (command-specific logic - none needed for stats)
   
   return {};
 }
