@@ -1,6 +1,8 @@
 import Database from 'better-sqlite3';
 import { createHash } from 'crypto';
 import { debugLog } from '../utils/debug.js';
+import { DatabaseMigrator } from './database-migrator.js';
+import { DatabaseOptimizer } from './database-optimizer.js';
 
 export interface MemoryEntry {
   id: number;
@@ -43,77 +45,36 @@ export class MemoryService {
   async initialize(): Promise<void> {
     try {
       this.db = new Database(this.dbPath);
-      this.initDb();
+      await this.initDb();
       debugLog('MemoryService initialized with database:', this.dbPath);
     } catch (error: any) {
       throw new Error(`Failed to initialize database: ${error.message}`);
     }
   }
 
-  private initDb(): void {
+  private async initDb(): Promise<void> {
     if (!this.db) {
       throw new Error('Database not initialized');
     }
     
-    // Enable WAL mode for better concurrency and performance
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('synchronous = NORMAL');
+    // Apply database optimizations first
+    DatabaseOptimizer.applyOptimizations(this.db);
     
-    // Create memories table
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS memories (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        content TEXT NOT NULL,
-        tags TEXT,
-        created_at TEXT,
-        hash TEXT UNIQUE
-      )
-    `);
+    // Run automatic migration system
+    const migrator = new DatabaseMigrator(this.db, this.dbPath);
+    await migrator.autoMigrate();
+    
+    // Optimize FTS after migration
+    DatabaseOptimizer.optimizeFTS(this.db);
+    
+    // Continue with statement preparation
+    this.prepareStatements();
+  }
 
-    // Create relationships table for linking memories
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS relationships (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        from_memory_id INTEGER,
-        to_memory_id INTEGER,
-        relationship_type TEXT DEFAULT 'related',
-        created_at TEXT,
-        FOREIGN KEY (from_memory_id) REFERENCES memories (id) ON DELETE CASCADE,
-        FOREIGN KEY (to_memory_id) REFERENCES memories (id) ON DELETE CASCADE,
-        UNIQUE(from_memory_id, to_memory_id, relationship_type)
-      )
-    `);
-
-    // Create FTS table for fast text search
-    this.db.exec(`
-      CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts 
-      USING fts5(content, tags, content='memories', content_rowid='id')
-    `);
-
-    // Create trigger to automatically update FTS when memories are inserted
-    this.db.exec(`
-      CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON memories BEGIN
-        INSERT INTO memories_fts (rowid, content, tags) 
-        VALUES (new.id, new.content, new.tags);
-      END;
-    `);
-
-    // Create trigger to automatically update FTS when memories are updated
-    this.db.exec(`
-      CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON memories BEGIN
-        UPDATE memories_fts SET content = new.content, tags = new.tags 
-        WHERE rowid = new.id;
-      END;
-    `);
-
-    // Create trigger to automatically delete from FTS when memories are deleted
-    this.db.exec(`
-      CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON memories BEGIN
-        DELETE FROM memories_fts WHERE rowid = old.id;
-      END;
-    `);
-
-    // Prepare statements for better performance
+  private prepareStatements(): void {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
     this.stmts = {
       insert: this.db!.prepare(`
         INSERT INTO memories (content, tags, created_at, hash) 
