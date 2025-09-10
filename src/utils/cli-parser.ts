@@ -21,12 +21,28 @@ export function parseCommandLineArgs(args: string[]): ParsedArgs {
             const flagName = arg.slice(2).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
 
             if (i + 1 < args.length && !args[i + 1].startsWith('--')) {
-                // Handle numeric values
                 const value = args[i + 1];
-                const numValue = Number(value);
-                parsed[flagName] = !isNaN(numValue) ? numValue : value;
+                
+                // Handle boolean strings explicitly
+                const lowerValue = value.toLowerCase();
+                if (lowerValue === 'true') {
+                    parsed[flagName] = true;
+                } else if (lowerValue === 'false') {
+                    parsed[flagName] = false;
+                } else {
+                    // Try to parse as number
+                    const numValue = Number(value);
+                    // Only treat as number if it's valid AND the original string looks numeric
+                    if (!isNaN(numValue) && value.trim() !== '' && /^-?\d+(\.\d+)?$/.test(value.trim())) {
+                        parsed[flagName] = numValue;
+                    } else {
+                        // Everything else is a string
+                        parsed[flagName] = value;
+                    }
+                }
                 i += 2;
             } else {
+                // Flag without value
                 parsed[flagName] = true;
                 i++;
             }
