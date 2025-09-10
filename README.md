@@ -8,6 +8,52 @@ A Model Context Protocol (MCP) server that provides persistent memory storage wi
 - **Search Memory**: Full-text search and tag-based filtering
 - **Delete Memory**: Remove memories by hash or tag
 - **Memory Stats**: Get statistics about stored memories
+- **Automatic Database Evolution**: Zero-configuration schema migrations with backups
+
+## Database Schema Evolution
+
+The Simple Memory MCP Server includes an automatic database migration system that ensures your database schema stays up-to-date without any manual intervention.
+
+### Key Features
+
+- **Zero Configuration**: Migrations happen automatically when the server starts
+- **Automatic Backups**: Creates backups before any schema changes (keeps last 5)
+- **Graceful Degradation**: Server continues to work even if migration fails
+- **Version Tracking**: Fast version detection using SQLite pragma
+- **Future-Proof**: JSON metadata columns for extensibility
+
+### How It Works
+
+1. **Fresh Installation**: Automatically creates the latest schema (v2) with all tables and optimizations
+2. **Existing Database**: Detects current version and applies only needed migrations
+3. **Backup Creation**: Creates timestamped backup in `backups/` directory before changes
+4. **Migration Application**: Applies schema changes incrementally and safely
+5. **Optimization**: Applies SQLite performance optimizations (WAL mode, cache tuning, etc.)
+
+### Current Schema Versions
+
+- **Version 1**: Initial schema with memories, relationships, and full-text search
+- **Version 2**: Adds JSON metadata columns for future extensibility
+
+### Performance Optimizations
+
+The migration system automatically applies these SQLite optimizations:
+
+- **WAL Mode**: Better concurrency for read-heavy workloads
+- **64MB Cache**: Reduced disk I/O for frequently accessed data
+- **Memory Temp Store**: Faster complex queries
+- **Foreign Key Constraints**: Data integrity protection
+- **Application ID**: Database type identification
+
+### Migration Testing
+
+Run the migration test suite to verify the system:
+
+```bash
+npm run test:migration
+```
+
+This tests fresh database creation, upgrades, and migration status reporting.
 
 ## Installation
 
@@ -140,14 +186,31 @@ npm run dev
 # Build TypeScript
 npm run build
 
-# Run tests
-npm test
+# Run all tests
+npm run test:all
+
+# Run specific test suites
+npm test                    # Core functionality tests
+npm run test:migration      # Database migration tests  
+npm run test:perf          # Performance tests
 
 # Run specific tool
 npm run cli store-memory -- --content "test" --tags "development"
 
 # Run with custom database
 MEMORY_DB="./test.db" npm run cli memory-stats
+```
+
+### Testing the Migration System
+
+To see the automatic migration system in action:
+
+```bash
+# Run the migration demo
+npm run build && node dist/demo/migration-demo.js
+
+# Run migration-specific tests
+npm run test:migration
 ```
 
 ## Configuration Examples
