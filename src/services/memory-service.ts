@@ -26,6 +26,7 @@ export interface MemoryStats {
   dbSize: number;
   dbPath: string;
   resolvedPath: string;
+  schemaVersion: number;
 }
 
 /**
@@ -460,13 +461,20 @@ export class MemoryService {
     const memoryCount = this.stmts.getStats.get() as any;
     const relationshipCount = this.stmts.getRelationshipStats.get() as any;
     
+    // Get current schema version from migrations table
+    const versionResult = this.db.prepare(
+      'SELECT MAX(version) as version FROM schema_migrations'
+    ).get() as any;
+    const schemaVersion = versionResult?.version || 0;
+    
     const stats = {
       totalMemories: memoryCount.count,
       totalRelationships: relationshipCount.count,
       dbSize: (this.db.pragma('page_size', { simple: true }) as number) * 
               (this.db.pragma('page_count', { simple: true }) as number),
       dbPath: this.dbPath,
-      resolvedPath: this.resolvedDbPath // Use cached value
+      resolvedPath: this.resolvedDbPath, // Use cached value
+      schemaVersion
     };
 
     debugLog('MemoryService: Stats:', stats);
