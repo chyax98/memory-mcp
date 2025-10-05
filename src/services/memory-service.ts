@@ -1,6 +1,9 @@
 import Database from 'better-sqlite3';
 import { createHash } from 'crypto';
+import { resolve } from 'path';
 import { debugLog } from '../utils/debug.js';
+import { runMigrations } from './migrations.js';
+import { DatabaseOptimizer } from './database-optimizer.js';
 
 export interface MemoryEntry {
   id: number;
@@ -32,12 +35,16 @@ export interface MemoryStats {
 export class MemoryService {
   private db: Database.Database | null = null;
   private dbPath: string;
+  private resolvedDbPath: string;
   private stmts!: Record<string, Database.Statement>;
   private maxContentSize: number = 1024 * 1024; // 1MB default
 
   constructor(dbPath: string = 'memory.db', maxContentSize?: number) {
     this.dbPath = dbPath;
     if (maxContentSize) this.maxContentSize = maxContentSize;
+    
+    // Cache resolved path once
+    this.resolvedDbPath = resolve(dbPath);
   }
 
   async initialize(): Promise<void> {
@@ -55,11 +62,10 @@ export class MemoryService {
       throw new Error('Database not initialized');
     }
     
-    // Enable WAL mode for better concurrency and performance
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('synchronous = NORMAL');
+    // Apply SQLite optimizations first
+    DatabaseOptimizer.applyOptimizations(this.db);
     
-    // Create memories table
+    // Create base tables (if they don't exist)
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS memories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -113,16 +119,62 @@ export class MemoryService {
       END;
     `);
 
+    // Run migrations (creates tags table, indexes, etc.)
+    // This is where all the magic happens - automatic, tracked, safe
+    runMigrations(this.db, this.dbPath);
+    
+    // Optimize FTS after migrations
+    DatabaseOptimizer.optimizeFTS(this.db);
+
     // Prepare statements for better performance
+    this.prepareStatements();
+
+    debugLog('MemoryService: Database initialized successfully');
+  }
+
+  private prepareStatements(): void {
     this.stmts = {
+      // Memory operations
       insert: this.db!.prepare(`
         INSERT INTO memories (content, tags, created_at, hash) 
         VALUES (?, ?, ?, ?)
       `),
-      insertRelationship: this.db!.prepare(`
-        INSERT INTO relationships (from_memory_id, to_memory_id, relationship_type, created_at)
-        VALUES (?, ?, ?, ?)
+      getMemoryById: this.db!.prepare(`
+        SELECT * FROM memories WHERE id = ?
       `),
+      getMemoryByHash: this.db!.prepare(`
+        SELECT * FROM memories WHERE hash = ?
+      `),
+      getRecent: this.db!.prepare(`
+        SELECT * FROM memories 
+        ORDER BY created_at DESC
+        LIMIT ?
+      `),
+      deleteByHash: this.db!.prepare(`
+        DELETE FROM memories WHERE hash = ?
+      `),
+      
+      // Tag operations (NEW)
+      insertTag: this.db!.prepare(`
+        INSERT OR IGNORE INTO tags (memory_id, tag) VALUES (?, ?)
+      `),
+      getTagsForMemory: this.db!.prepare(`
+        SELECT tag FROM tags WHERE memory_id = ? ORDER BY tag
+      `),
+      searchByTag: this.db!.prepare(`
+        SELECT DISTINCT m.*
+        FROM memories m
+        INNER JOIN tags t ON m.id = t.memory_id
+        WHERE t.tag = ?
+        ORDER BY m.created_at DESC
+        LIMIT ?
+      `),
+      deleteByTag: this.db!.prepare(`
+        DELETE FROM memories 
+        WHERE id IN (SELECT memory_id FROM tags WHERE tag = ?)
+      `),
+      
+      // FTS search (updated to just query text)
       searchText: this.db!.prepare(`
         SELECT m.* FROM memories m
         JOIN memories_fts fts ON m.id = fts.rowid
@@ -130,22 +182,19 @@ export class MemoryService {
         ORDER BY m.created_at DESC
         LIMIT ?
       `),
-      searchTags: this.db!.prepare(`
+      
+      // Legacy tag search (fallback for old databases before migration)
+      searchTagsLegacy: this.db!.prepare(`
         SELECT * FROM memories 
         WHERE tags LIKE ?
         ORDER BY created_at DESC
         LIMIT ?
       `),
-      getRecent: this.db!.prepare(`
-        SELECT * FROM memories 
-        ORDER BY created_at DESC
-        LIMIT ?
-      `),
-      getMemoryById: this.db!.prepare(`
-        SELECT * FROM memories WHERE id = ?
-      `),
-      getMemoryByHash: this.db!.prepare(`
-        SELECT * FROM memories WHERE hash = ?
+      
+      // Relationship operations
+      insertRelationship: this.db!.prepare(`
+        INSERT INTO relationships (from_memory_id, to_memory_id, relationship_type, created_at)
+        VALUES (?, ?, ?, ?)
       `),
       getRelated: this.db!.prepare(`
         SELECT m.*, r.relationship_type 
@@ -155,12 +204,8 @@ export class MemoryService {
         ORDER BY r.created_at DESC
         LIMIT ?
       `),
-      deleteByHash: this.db!.prepare(`
-        DELETE FROM memories WHERE hash = ?
-      `),
-      deleteByTag: this.db!.prepare(`
-        DELETE FROM memories WHERE tags LIKE ?
-      `),
+      
+      // Stats
       getStats: this.db!.prepare(`
         SELECT COUNT(*) as count FROM memories
       `),
