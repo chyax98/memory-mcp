@@ -64,53 +64,67 @@ export async function execute(args: StoreMemoryArgs, context: ToolContext): Prom
  * Create automatic relationships based on similar tags and content
  */
 async function createAutoRelationships(hash: string, args: StoreMemoryArgs, context: ToolContext): Promise<number> {
-  let relationshipsCreated = 0;
-  
   if (!args.tags || args.tags.length === 0) {
-    return relationshipsCreated;
+    return 0;
   }
   
   try {
     // Find memories with similar tags
     const similarMemories = context.memoryService.search(undefined, args.tags, 5);
     
-    for (const memory of similarMemories) {
-      if (memory.hash !== hash) { // Don't link to self
+    // Build array of relationships to create
+    const relationships = similarMemories
+      .filter(memory => memory.hash !== hash) // Don't link to self
+      .map(memory => {
         const commonTags = args.tags!.filter(tag => memory.tags.includes(tag));
         if (commonTags.length > 0) {
-          const success = context.memoryService.linkMemories(hash, memory.hash, 'similar');
-          if (success) relationshipsCreated++;
+          return { 
+            fromHash: hash, 
+            toHash: memory.hash, 
+            relationshipType: 'similar' as const 
+          };
         }
-      }
+        return null;
+      })
+      .filter((rel): rel is NonNullable<typeof rel> => rel !== null);
+    
+    // Use bulk insert for better performance
+    if (relationships.length > 0) {
+      return context.memoryService.linkMemoriesBulk(relationships);
     }
+    
+    return 0;
   } catch (error) {
-    // Log but don't fail the storage
     console.error('Auto-relationship creation failed:', error);
+    return 0;
   }
-  
-  return relationshipsCreated;
 }
 
 /**
  * Create explicit relationships based on relateTo tags
  */
 async function createExplicitRelationships(hash: string, relateTo: string[], context: ToolContext): Promise<number> {
-  let relationshipsCreated = 0;
-  
   try {
     // Find memories with the specified tags
     const relatedMemories = context.memoryService.search(undefined, relateTo, 10);
     
-    for (const memory of relatedMemories) {
-      if (memory.hash !== hash) { // Don't link to self
-        const success = context.memoryService.linkMemories(hash, memory.hash, 'related');
-        if (success) relationshipsCreated++;
-      }
+    // Build array of relationships to create
+    const relationships = relatedMemories
+      .filter(memory => memory.hash !== hash) // Don't link to self
+      .map(memory => ({ 
+        fromHash: hash, 
+        toHash: memory.hash, 
+        relationshipType: 'related' as const 
+      }));
+    
+    // Use bulk insert for better performance
+    if (relationships.length > 0) {
+      return context.memoryService.linkMemoriesBulk(relationships);
     }
+    
+    return 0;
   } catch (error) {
-    // Log but don't fail the storage
     console.error('Explicit relationship creation failed:', error);
+    return 0;
   }
-  
-  return relationshipsCreated;
 }

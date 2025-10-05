@@ -346,6 +346,54 @@ export class MemoryService {
   }
 
   /**
+   * Bulk link memories in a single transaction for performance
+   * Returns the number of relationships successfully created
+   */
+  linkMemoriesBulk(relationships: Array<{ fromHash: string; toHash: string; relationshipType?: string }>): number {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    if (relationships.length === 0) {
+      return 0;
+    }
+
+    const insertBulk = this.db.transaction(() => {
+      let count = 0;
+      const createdAt = new Date().toISOString();
+      
+      for (const rel of relationships) {
+        const fromMemory = this.stmts.getMemoryByHash.get(rel.fromHash) as any;
+        const toMemory = this.stmts.getMemoryByHash.get(rel.toHash) as any;
+        
+        if (!fromMemory || !toMemory) continue;
+        
+        try {
+          this.stmts.insertRelationship.run(
+            fromMemory.id,
+            toMemory.id,
+            rel.relationshipType || 'related',
+            createdAt
+          );
+          count++;
+        } catch (error: any) {
+          if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+            // Skip duplicates silently
+            continue;
+          }
+          throw error;
+        }
+      }
+      
+      return count;
+    });
+
+    const created = insertBulk();
+    debugLog('MemoryService: Bulk linked', created, 'relationships');
+    return created;
+  }
+
+  /**
    * Link two memories with a relationship
    */
   linkMemories(fromHash: string, toHash: string, relationshipType: string = 'related'): boolean {
