@@ -90,24 +90,24 @@ export class MemoryService {
       )
     `);
 
-    // Create FTS table for fast text search
+    // Create FTS table for fast text search (content only, tags in separate table)
     this.db.exec(`
       CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts 
-      USING fts5(content, tags, content='memories', content_rowid='id')
+      USING fts5(content, content='memories', content_rowid='id')
     `);
 
     // Create trigger to automatically update FTS when memories are inserted
     this.db.exec(`
       CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON memories BEGIN
-        INSERT INTO memories_fts (rowid, content, tags) 
-        VALUES (new.id, new.content, new.tags);
+        INSERT INTO memories_fts (rowid, content) 
+        VALUES (new.id, new.content);
       END;
     `);
 
     // Create trigger to automatically update FTS when memories are updated
     this.db.exec(`
       CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON memories BEGIN
-        UPDATE memories_fts SET content = new.content, tags = new.tags 
+        UPDATE memories_fts SET content = new.content 
         WHERE rowid = new.id;
       END;
     `);

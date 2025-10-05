@@ -77,6 +77,64 @@ export const migrations: Migration[] = [
       
       debugLog('Migration 2: Completed successfully');
     }
+  },
+  {
+    version: 3,
+    description: 'Update FTS table to remove tags column',
+    up: (db: Database.Database) => {
+      debugLog('Migration 3: Updating FTS table schema');
+      
+      // Always recreate FTS table to ensure consistency
+      debugLog('Recreating FTS table with updated schema');
+      
+      // Drop old FTS table and triggers
+      db.exec(`DROP TRIGGER IF EXISTS memories_ai`);
+      db.exec(`DROP TRIGGER IF EXISTS memories_au`);
+      db.exec(`DROP TRIGGER IF EXISTS memories_ad`);
+      db.exec(`DROP TABLE IF EXISTS memories_fts`);
+      
+      // Create new FTS table without tags column
+      db.exec(`
+        CREATE VIRTUAL TABLE memories_fts 
+        USING fts5(content, content='memories', content_rowid='id')
+      `);
+      
+      // Recreate triggers
+      db.exec(`
+        CREATE TRIGGER memories_ai AFTER INSERT ON memories BEGIN
+          INSERT INTO memories_fts (rowid, content) 
+          VALUES (new.id, new.content);
+        END;
+      `);
+      
+      db.exec(`
+        CREATE TRIGGER memories_au AFTER UPDATE ON memories BEGIN
+          UPDATE memories_fts SET content = new.content 
+          WHERE rowid = new.id;
+        END;
+      `);
+      
+      db.exec(`
+        CREATE TRIGGER memories_ad AFTER DELETE ON memories BEGIN
+          DELETE FROM memories_fts WHERE rowid = old.id;
+        END;
+      `);
+      
+      // Repopulate FTS table with existing memories
+      const memories = db.prepare(`SELECT id, content FROM memories`).all() as Array<{ id: number; content: string }>;
+      if (memories.length > 0) {
+        debugLog(`Repopulating FTS table with ${memories.length} memories`);
+        const insertFts = db.prepare(`INSERT INTO memories_fts (rowid, content) VALUES (?, ?)`);
+        const populateFts = db.transaction(() => {
+          for (const memory of memories) {
+            insertFts.run(memory.id, memory.content);
+          }
+        });
+        populateFts();
+      }
+      
+      debugLog('Migration 3: FTS table updated successfully');
+    }
   }
   // Future migrations go here - just add to the array!
 ];
