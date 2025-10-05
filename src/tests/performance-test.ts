@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { MemoryService } from '../services/memory-service.js';
+import { formatHash } from '../utils/debug.js';
 import * as fs from 'fs';
 
 async function performanceTest(): Promise<void> {
@@ -26,7 +27,7 @@ async function performanceTest(): Promise<void> {
       const endTime = Date.now();
       const duration = endTime - startTime;
       
-      console.log(`✓ Stored in ${duration}ms (hash: ${hash.substring(0, 8)}...)`);
+      console.log(`✓ Stored in ${duration}ms (hash: ${formatHash(hash)})`);
       
       // Verify storage worked
       const retrieved = service.getByHash(hash);

@@ -1,5 +1,5 @@
 import type { ToolContext } from '../../types/tools.js';
-import { debugLog } from '../../utils/debug.js';
+import { debugLog, formatHash } from '../../utils/debug.js';
 
 interface StoreMemoryArgs {
   content: string;
@@ -42,8 +42,8 @@ export async function execute(args: StoreMemoryArgs, context: ToolContext): Prom
     }
     
     const message = relationshipsCreated > 0 
-      ? `Memory stored successfully with hash: ${hash.substring(0, 8)}... (${relationshipsCreated} relationships created)`
-      : `Memory stored successfully with hash: ${hash.substring(0, 8)}...`;
+      ? `Memory stored successfully with hash: ${formatHash(hash)} (${relationshipsCreated} relationships created)`
+      : `Memory stored successfully with hash: ${formatHash(hash)}...`;
     
     return {
       success: true,

@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { createHash } from 'crypto';
 import { resolve } from 'path';
-import { debugLog } from '../utils/debug.js';
+import { debugLog, debugLogHash } from '../utils/debug.js';
 import { runMigrations } from './migrations.js';
 import { DatabaseOptimizer } from './database-optimizer.js';
 
@@ -250,11 +250,11 @@ export class MemoryService {
       });
       
       const resultHash = insertMemory();
-      debugLog('MemoryService: Stored memory with hash:', hash.substring(0, 8) + '...');
+      debugLogHash('MemoryService: Stored memory with hash:', hash);
       return resultHash;
     } catch (error: any) {
       if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-        debugLog('MemoryService: Memory already exists with hash:', hash.substring(0, 8) + '...');
+        debugLogHash('MemoryService: Memory already exists with hash:', hash);
         return hash; // Already exists
       }
       debugLog('MemoryService: Error storing memory:', error);
@@ -326,7 +326,7 @@ export class MemoryService {
   delete(hash: string): boolean {
     const result = this.stmts.deleteByHash.run(hash);
     const deleted = result.changes > 0;
-    debugLog('MemoryService: Delete by hash', hash.substring(0, 8) + '...', deleted ? 'success' : 'not found');
+    debugLogHash('MemoryService: Delete by hash', hash, deleted ? 'success' : 'not found');
     return deleted;
   }
 
@@ -413,7 +413,7 @@ export class MemoryService {
         relationshipType, 
         createdAt
       );
-      debugLog('MemoryService: Linked memories:', fromHash.substring(0, 8) + '...', 'to', toHash.substring(0, 8) + '...');
+      debugLogHash('MemoryService: Linked memories:', fromHash, 'to', toHash);
       return true;
     } catch (error: any) {
       if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
@@ -430,7 +430,7 @@ export class MemoryService {
   getRelated(hash: string, limit: number = 10): MemoryEntry[] {
     const memory = this.stmts.getMemoryByHash.get(hash) as any;
     if (!memory) {
-      debugLog('MemoryService: Memory not found for getRelated:', hash.substring(0, 8) + '...');
+      debugLogHash('MemoryService: Memory not found for getRelated:', hash);
       return [];
     }
 

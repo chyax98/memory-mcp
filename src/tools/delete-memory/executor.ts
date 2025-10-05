@@ -1,4 +1,5 @@
 import type { ToolContext } from '../../types/tools.js';
+import { formatHash } from '../../utils/debug.js';
 
 interface DeleteMemoryArgs {
   hash?: string;
