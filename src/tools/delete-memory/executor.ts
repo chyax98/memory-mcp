@@ -24,8 +24,8 @@ export async function execute(args: DeleteMemoryArgs, context: ToolContext): Pro
         success,
         deleted,
         message: success 
-          ? `Memory with hash ${args.hash.substring(0, 8)}... deleted successfully`
-          : `Memory with hash ${args.hash.substring(0, 8)}... not found`
+          ? `Memory with hash ${formatHash(args.hash)} deleted successfully`
+          : `Memory with hash ${formatHash(args.hash)} not found`
       };
     } else if (args.tag) {
       deleted = context.memoryService.deleteByTag(args.tag);
