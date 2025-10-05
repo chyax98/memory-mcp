@@ -32,14 +32,14 @@ const server = new Server(
 );
 
 // Initialize services and start server
-async function initializeServices() {
+function initializeServices(): MemoryService {
   let memoryService: MemoryService;
 
   try {
     // Use environment variable or default path
     const dbPath = process.env.MEMORY_DB || './memory.db';
     memoryService = new MemoryService(dbPath);
-    await memoryService.initialize();
+    memoryService.initialize();
     debugLog('Memory service initialized');
   } catch (error) {
     console.error('Failed to initialize services:', error);
@@ -50,7 +50,7 @@ async function initializeServices() {
 }
 
 // Initialize and get memory service
-const memoryService = await initializeServices();
+const memoryService = initializeServices();
 
 // Create tool context
 const toolContext: ToolContext = {
@@ -152,21 +152,21 @@ async function main() {
 }
 
 // Handle cleanup
-const cleanup = async () => {
+const cleanup = () => {
   if (memoryService) {
-    await memoryService.close();
+    memoryService.close();
   }
   process.exit(0);
 };
 
 process.on('SIGINT', cleanup);
 process.on('SIGTERM', cleanup);
-process.on('uncaughtException', async (error) => {
+process.on('uncaughtException', (error) => {
   console.error('Uncaught exception:', error);
-  await cleanup();
+  cleanup();
 });
 
-main().catch(async (error) => {
+main().catch((error) => {
   console.error('Fatal error:', error);
-  await cleanup();
+  cleanup();
 });

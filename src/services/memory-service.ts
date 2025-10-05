@@ -47,7 +47,7 @@ export class MemoryService {
     this.resolvedDbPath = resolve(dbPath);
   }
 
-  async initialize(): Promise<void> {
+  initialize(): void {
     try {
       this.db = new Database(this.dbPath);
       this.initDb();
@@ -225,7 +225,6 @@ export class MemoryService {
     }
 
     const hash = createHash('md5').update(content).digest('hex');
-    const tagsStr = tags.join(',');
     const createdAt = new Date().toISOString();
 
     try {
@@ -233,11 +232,26 @@ export class MemoryService {
         throw new Error('Database not initialized');
       }
       
-      // Insert only into main table, FTS will be updated by trigger
-      this.stmts.insert.run(content, tagsStr, createdAt, hash);
+      // Use transaction for atomicity and performance
+      const insertMemory = this.db.transaction(() => {
+        // Insert memory (tags column kept as null for backward compatibility)
+        const result = this.stmts.insert.run(content, null, createdAt, hash);
+        const memoryId = result.lastInsertRowid as number;
+        
+        // Insert tags into normalized tags table
+        for (const tag of tags) {
+          const normalizedTag = tag.trim().toLowerCase();
+          if (normalizedTag) {
+            this.stmts.insertTag.run(memoryId, normalizedTag);
+          }
+        }
+        
+        return hash;
+      });
       
+      const resultHash = insertMemory();
       debugLog('MemoryService: Stored memory with hash:', hash.substring(0, 8) + '...');
-      return hash;
+      return resultHash;
     } catch (error: any) {
       if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
         debugLog('MemoryService: Memory already exists with hash:', hash.substring(0, 8) + '...');
@@ -256,20 +270,48 @@ export class MemoryService {
 
     if (query) {
       // Use FTS for text search
-      results = this.stmts.searchText.all(query, limit);
+      const ftsResults = this.stmts.searchText.all(query, limit);
+      
+      // Hydrate with tags from tags table
+      results = ftsResults.map((row: any) => {
+        const tagRows = this.stmts.getTagsForMemory.all(row.id) as Array<{ tag: string }>;
+        return {
+          ...row,
+          tags: tagRows.map(t => t.tag)
+        };
+      });
     } else if (tags && tags.length > 0) {
-      // Simple tag search (could be improved with proper tag normalization)
-      const tagPattern = `%${tags[0]}%`;
-      results = this.stmts.searchTags.all(tagPattern, limit);
+      // Fast indexed tag search using normalized tags table
+      const normalizedTag = tags[0].trim().toLowerCase();
+      const tagResults = this.stmts.searchByTag.all(normalizedTag, limit);
+      
+      // Hydrate with all tags for each memory
+      results = tagResults.map((row: any) => {
+        const tagRows = this.stmts.getTagsForMemory.all(row.id) as Array<{ tag: string }>;
+        return {
+          ...row,
+          tags: tagRows.map(t => t.tag)
+        };
+      });
     } else {
       // Get recent memories
-      results = this.stmts.getRecent.all(limit);
+      const recentResults = this.stmts.getRecent.all(limit);
+      
+      // Hydrate with tags
+      results = recentResults.map((row: any) => {
+        const tagRows = this.stmts.getTagsForMemory.all(row.id) as Array<{ tag: string }>;
+        return {
+          ...row,
+          tags: tagRows.map(t => t.tag)
+        };
+      });
     }
 
+    // Convert to MemoryEntry format
     const memories = results.map(row => ({
       id: row.id,
       content: row.content,
-      tags: row.tags ? row.tags.split(',') : [],
+      tags: row.tags || [],
       createdAt: row.created_at,
       hash: row.hash
     }));
@@ -292,8 +334,14 @@ export class MemoryService {
    * Delete memories by tag
    */
   deleteByTag(tag: string): number {
-    const result = this.stmts.deleteByTag.run(`%${tag}%`);
-    debugLog('MemoryService: Deleted', result.changes, 'memories with tag:', tag);
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+    
+    const normalizedTag = tag.trim().toLowerCase();
+    const result = this.stmts.deleteByTag.run(normalizedTag);
+    
+    debugLog('MemoryService: Deleted', result.changes, 'memories with tag:', normalizedTag);
     return result.changes;
   }
 
@@ -356,7 +404,7 @@ export class MemoryService {
   /**
    * Get statistics about the memory database
    */
-  async stats(): Promise<MemoryStats> {
+  stats(): MemoryStats {
     if (!this.db) {
       throw new Error('Database not initialized');
     }
@@ -364,17 +412,13 @@ export class MemoryService {
     const memoryCount = this.stmts.getStats.get() as any;
     const relationshipCount = this.stmts.getRelationshipStats.get() as any;
     
-    // Get path information
-    const path = await import('path');
-    const resolvedPath = path.resolve(this.dbPath);
-    
     const stats = {
       totalMemories: memoryCount.count,
       totalRelationships: relationshipCount.count,
-      dbSize: (this.db.prepare("PRAGMA page_size").get() as any)['page_size'] * 
-             (this.db.prepare("PRAGMA page_count").get() as any)['page_count'],
+      dbSize: (this.db.pragma('page_size', { simple: true }) as number) * 
+              (this.db.pragma('page_count', { simple: true }) as number),
       dbPath: this.dbPath,
-      resolvedPath: resolvedPath
+      resolvedPath: this.resolvedDbPath // Use cached value
     };
 
     debugLog('MemoryService: Stats:', stats);
@@ -402,7 +446,7 @@ export class MemoryService {
   /**
    * Close the database connection
    */
-  async close(): Promise<void> {
+  close(): void {
     if (this.db) {
       this.db.close();
       this.db = null;
