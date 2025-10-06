@@ -75,18 +75,15 @@ async function createAutoRelationships(hash: string, args: StoreMemoryArgs, cont
     // Build array of relationships to create
     const relationships = similarMemories
       .filter(memory => memory.hash !== hash) // Don't link to self
-      .map(memory => {
+      .filter(memory => {
         const commonTags = args.tags!.filter(tag => memory.tags.includes(tag));
-        if (commonTags.length > 0) {
-          return { 
-            fromHash: hash, 
-            toHash: memory.hash, 
-            relationshipType: 'similar' as const 
-          };
-        }
-        return null;
+        return commonTags.length > 0;
       })
-      .filter((rel): rel is NonNullable<typeof rel> => rel !== null);
+      .map(memory => ({ 
+        fromHash: hash, 
+        toHash: memory.hash, 
+        relationshipType: 'similar' as const 
+      }));
     
     // Use bulk insert for better performance
     if (relationships.length > 0) {

@@ -46,6 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Bulk Operations**: Transaction-based bulk relationship creation
   - `linkMemoriesBulk()` method for 10-50x faster linking
   - Automatic relationship detection using bulk operations
+  - Improved relationship creation by building relationships array first then using bulk insert instead of sequential individual database calls
+  - Provides 10-50x performance improvement through transaction-based batch operations
   
 - **Debug Utilities**: Centralized hash formatting and debug logging
   - `formatHash()` - Consistent 8-character hash display
