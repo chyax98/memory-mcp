@@ -5,6 +5,23 @@ All notable changes to the Simple Memory MCP Server will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Backup Statistics**: Memory stats now includes backup information when configured
+  - Backup enabled status
+  - Backup path location
+  - Number of backup files
+  - Minutes since last backup
+  - Minutes until next backup
+  
+- **Enhanced Documentation**: Comprehensive README improvements
+  - Performance metrics table with throughput
+  - Cloud storage best practices integrated
+  - Clear installation options (npm vs development)
+  - Backup configuration examples
+  - Real-world usage examples
+
 ## [2.0.0] - 2025-01-XX
 
 ### Added

@@ -250,6 +250,24 @@ Get statistics about stored memories.
 - **Throttled** - Won't backup again until interval passes
 - **Efficient** - No wasted backups when idle
 
+**⚠️ Cloud Storage Best Practices:**
+- ✅ **Recommended**: Store database locally, backup to cloud (as shown above)
+- ⚠️ **Not Recommended**: Store database directly in OneDrive/Dropbox
+  - WAL mode creates 3 files that sync at different times → corruption risk
+  - File locking conflicts cause "database locked" errors
+  - 2-10x slower performance
+
+**If you must store directly in cloud storage**, enable safe mode:
+```json
+{
+  "env": {
+    "MEMORY_DB": "/path/to/OneDrive/memory.db",
+    "MEMORY_CLOUD_SAFE": "true"
+  }
+}
+```
+This uses DELETE journal mode instead of WAL (30-50% slower but safer).
+
 ### Multiple Database Instances
 
 Run multiple instances for different contexts:
@@ -441,7 +459,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📚 Additional Resources
 
-- [Cloud Storage Setup](CLOUD-STORAGE.md) - Configure backups to OneDrive/Dropbox
 - [Changelog](CHANGELOG.md) - Version history and changes
 
 ---
