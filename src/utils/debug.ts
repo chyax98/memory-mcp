@@ -53,5 +53,17 @@ export function debugToolCall(name: string, args: any) {
   }
 }
 
+/**
+ * Format timestamp for filenames
+ * Converts ISO timestamp to filesystem-safe format: YYYY-MM-DD_HH-MM-SS
+ * Example: 2025-01-15T14:30:45.123Z -> 2025-01-15_14-30-45
+ */
+export function formatTimestampForFilename(date: Date = new Date()): string {
+  return date.toISOString()
+    .replace(/[:.]/g, '-')  // Replace colons and dots with dashes
+    .replace('T', '_')       // Replace T with underscore for readability
+    .slice(0, -5);          // Remove milliseconds and Z suffix
+}
+
 // Alias for compatibility
 export const debugMCP = debugLog;

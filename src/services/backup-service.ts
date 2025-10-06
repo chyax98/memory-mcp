@@ -1,7 +1,7 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'fs';
 import { join, dirname, basename } from 'path';
 import Database from 'better-sqlite3';
-import { debugLog } from '../utils/debug.js';
+import { debugLog, formatTimestampForFilename } from '../utils/debug.js';
 
 export interface BackupConfig {
   backupPath: string;
@@ -72,7 +72,7 @@ export class BackupService {
     }
 
     try {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, -5);
+      const timestamp = formatTimestampForFilename();
       const backupFileName = `${basename(this.dbPath, '.db')}_${label}_${timestamp}.db`;
       const backupPath = join(this.config.backupPath, backupFileName);
 

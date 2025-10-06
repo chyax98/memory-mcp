@@ -258,8 +258,10 @@ export class MemoryService {
       
       // Use transaction for atomicity and performance
       const insertMemory = this.db.transaction(() => {
-        // Insert memory (tags column kept as null for backward compatibility)
-        const result = this.stmts.insert.run(content, null, createdAt, hash);
+        // Insert memory with tags=null (legacy column deprecated in v2.0)
+        // Tags are now stored in normalized 'tags' table for performance
+        // The 'tags' column is kept NULL for backward compatibility with schema
+        const result = this.stmts.insert.run(content, /* tags */ null, createdAt, hash);
         const memoryId = result.lastInsertRowid as number;
         
         // Insert tags into normalized tags table
