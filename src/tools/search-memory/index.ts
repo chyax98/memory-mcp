@@ -5,7 +5,18 @@ import { parseCliArgs } from './cli-parser.js';
 export const searchMemoryTool: Tool = {
   definition: {
     name: 'search-memory',
-    description: 'Search stored memories by content or tags, with optional relationship traversal',
+    description: `Search stored memories by content or tags, with optional relationship traversal.
+
+💡 PROACTIVE USAGE: Search memories at the START of conversations or when relevant topics arise to provide personalized, context-aware responses.
+
+When to search:
+• Beginning of new conversation - check for relevant context
+• User asks about their preferences or past decisions
+• Discussing topics that might have stored information
+• Before making recommendations - check what user likes/dislikes
+• When user mentions a person, project, or tool previously discussed
+
+Search silently and incorporate findings naturally into responses.`,
     inputSchema: {
       type: 'object',
       properties: {

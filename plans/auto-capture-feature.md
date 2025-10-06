@@ -1,9 +1,10 @@
 # Auto-Capture Feature - Implementation Plan
 
-**Status**: Draft  
+**Status**: ✅ Implemented (Option 1: System Prompt)  
 **Created**: October 6, 2025  
-**Problem**: Users must explicitly ask to save memories - major friction point
-**Solution**: Smart auto-capture with LLM-driven decision making
+**Implemented**: October 6, 2025  
+**Problem**: Users must explicitly ask to save memories - major friction point  
+**Solution**: Smart auto-capture with LLM-driven decision making via system prompts
 
 ## The Core Problem
 
