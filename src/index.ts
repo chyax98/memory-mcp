@@ -31,32 +31,24 @@ const server = new Server(
   }
 );
 
-// Initialize services and start server
-async function initializeServices() {
-  let memoryService: MemoryService;
-
+// Initialize services
+function initializeServices(): MemoryService {
   try {
-    // Use environment variable or default path
     const dbPath = process.env.MEMORY_DB || './memory.db';
-    memoryService = new MemoryService(dbPath);
-    await memoryService.initialize();
+    const memoryService = new MemoryService(dbPath);
+    memoryService.initialize();
+    
     debugLog('Memory service initialized');
+    return memoryService;
   } catch (error) {
     console.error('Failed to initialize services:', error);
     process.exit(1);
   }
-
-  return memoryService;
 }
 
-// Initialize and get memory service
-const memoryService = await initializeServices();
-
-// Create tool context
-const toolContext: ToolContext = {
-  memoryService,
-  config: {}
-};
+// Global references (initialized in main())
+let memoryService: MemoryService;
+let toolContext: ToolContext;
 
 // List available tools
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -124,6 +116,15 @@ server.setRequestHandler(GetPromptRequestSchema, async (request) => {
 async function main() {
   const args = process.argv.slice(2);
   
+  // Initialize services (backup auto-configures from env vars)
+  memoryService = initializeServices();
+  
+  // Create tool context
+  toolContext = {
+    memoryService,
+    config: {}
+  };
+  
   if (args.length > 0) {
     // CLI mode
     const [toolName, ...toolArgs] = args;
@@ -152,21 +153,21 @@ async function main() {
 }
 
 // Handle cleanup
-const cleanup = async () => {
+const cleanup = () => {
   if (memoryService) {
-    await memoryService.close();
+    memoryService.close();
   }
   process.exit(0);
 };
 
 process.on('SIGINT', cleanup);
 process.on('SIGTERM', cleanup);
-process.on('uncaughtException', async (error) => {
+process.on('uncaughtException', (error) => {
   console.error('Uncaught exception:', error);
-  await cleanup();
+  cleanup();
 });
 
-main().catch(async (error) => {
+main().catch((error) => {
   console.error('Fatal error:', error);
-  await cleanup();
+  cleanup();
 });

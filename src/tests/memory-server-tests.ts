@@ -9,6 +9,7 @@ import { spawn } from 'child_process';
 import { promisify } from 'util';
 import { unlink } from 'fs/promises';
 import path from 'path';
+import { formatHash } from '../utils/debug.js';
 import { parseJsonOutput } from '../utils/json-parser.js';
 
 const execAsync = promisify(spawn);
@@ -101,7 +102,7 @@ async function testStoreMemory(): Promise<void> {
     throw new Error('Store memory did not return expected success response');
   }
 
-  console.log('✓ Memory stored successfully with hash:', output.hash.substring(0, 8) + '...');
+  console.log('✓ Memory stored successfully with hash:', formatHash(output.hash));
 }
 
 /**
