@@ -7,9 +7,15 @@
   "bin": {
     "simple-memory": "./dist/index.js"
   },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "postbuild": "node -e \"if (process.platform !== 'win32') { require('child_process').execSync('chmod +x dist/index.js'); }\"",
+    "prepublishOnly": "npm run build",
     "start": "node dist/index.js",
     "cli": "node dist/index.js",
     "dev": "tsx src/index.ts",
@@ -32,11 +38,22 @@
   },
   "keywords": [
     "mcp",
+    "model-context-protocol",
     "memory",
     "storage",
     "sqlite",
-    "tags"
+    "tags",
+    "ai",
+    "llm"
   ],
-  "author": "",
-  "license": "MIT"
+  "author": "chrisribe",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chrisribe/simple-memory-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/chrisribe/simple-memory-mcp/issues"
+  },
+  "homepage": "https://github.com/chrisribe/simple-memory-mcp#readme"
 }

@@ -28,6 +28,11 @@ export interface MemoryStats {
   dbPath: string;
   resolvedPath: string;
   schemaVersion: number;
+  backupEnabled?: boolean;
+  backupPath?: string;
+  backupCount?: number;
+  lastBackupAge?: number; // minutes since last backup
+  nextBackupIn?: number; // minutes until next backup (-1 if will backup on next write)
 }
 
 /**
@@ -497,7 +502,7 @@ export class MemoryService {
     ).get() as any;
     const schemaVersion = versionResult?.version || 0;
     
-    const stats = {
+    const stats: MemoryStats = {
       totalMemories: memoryCount.count,
       totalRelationships: relationshipCount.count,
       dbSize: (this.db.pragma('page_size', { simple: true }) as number) * 
@@ -506,6 +511,26 @@ export class MemoryService {
       resolvedPath: this.resolvedDbPath, // Use cached value
       schemaVersion
     };
+    
+    // Add backup information if backup service is configured
+    if (this.backup) {
+      const backups = this.backup.listBackups();
+      const lastBackupAge = this.backup.getTimeSinceLastBackup();
+      const backupInterval = parseInt(process.env.MEMORY_BACKUP_INTERVAL || '0', 10);
+      
+      stats.backupEnabled = true;
+      stats.backupPath = process.env.MEMORY_BACKUP_PATH;
+      stats.backupCount = backups.length;
+      stats.lastBackupAge = lastBackupAge >= 0 ? lastBackupAge : undefined;
+      
+      // Calculate next backup time
+      if (backupInterval > 0 && lastBackupAge >= 0) {
+        const nextBackup = backupInterval - lastBackupAge;
+        stats.nextBackupIn = nextBackup > 0 ? nextBackup : -1; // -1 means will backup on next write
+      } else if (backupInterval === 0) {
+        stats.nextBackupIn = -1; // Will backup on every write
+      }
+    }
 
     debugLog('MemoryService: Stats:', stats);
     return stats;
