@@ -6,8 +6,8 @@ Write-Host "Working directory: $PSScriptRoot\..\..`n" -ForegroundColor Gray
 Set-Location "$PSScriptRoot\..\.."
 
 # Setup test environment
-$testDb = "C:\Users\cribe\AppData\Local\Temp\backup-test-$(Get-Date -Format 'HHmmss').db"
-$testBackupPath = "C:\Users\cribe\AppData\Local\Temp\backup-test-backups-$(Get-Date -Format 'HHmmss')"
+$testDb = "$env:TEMP\backup-test-$(Get-Date -Format 'HHmmss').db"
+$testBackupPath = "$env:TEMP\backup-test-backups-$(Get-Date -Format 'HHmmss')"
 
 $env:MEMORY_DB = $testDb
 $env:MEMORY_BACKUP_PATH = $testBackupPath
