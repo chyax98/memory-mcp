@@ -69,6 +69,10 @@ You can specify a custom database path using the `MEMORY_DB` environment variabl
 
 **Environment Variables:**
 - `MEMORY_DB`: Path to the SQLite database file (default: `./memory.db`)
+- `MEMORY_BACKUP_PATH`: Optional. Enable automatic backups to this directory
+- `MEMORY_BACKUP_INTERVAL`: Optional. Minutes between auto-backups (0 = manual only)
+- `MEMORY_BACKUP_KEEP`: Optional. Number of backups to keep (default: 10)
+- `MEMORY_CLOUD_SAFE`: Optional. Set to `true` for OneDrive/Dropbox compatibility (slower but safer)
 
 ### Command Line Interface
 
@@ -193,9 +197,47 @@ All 28 tests passing with 100% backward compatibility guaranteed.
 
 ## Configuration Examples
 
+### Automatic Backups (Optional)
+
+Enable lazy backups that trigger only when data changes:
+
+```json
+{
+  "mcpServers": {
+    "simple-memory": {
+      "command": "node",
+      "args": ["/path/to/simple-memory-mcp/dist/index.js"],
+      "env": {
+        "MEMORY_DB": "/path/to/local/memory.db",
+        "MEMORY_BACKUP_PATH": "/path/to/cloud/backups",
+        "MEMORY_BACKUP_INTERVAL": "60",
+        "MEMORY_BACKUP_KEEP": "24"
+      }
+    }
+  }
+}
+```
+
+**How it works:**
+- **Lazy backup**: Only backs up after write operations (store/delete)
+- **Throttled**: Won't backup again until interval passes (e.g., 60 minutes)
+- **Efficient**: No wasted backups when idle, perfect for sporadic usage
+
+**Recommended setup for cloud storage:**
+- Store database locally for performance
+- Backup to OneDrive/Dropbox for safety
+- `MEMORY_BACKUP_INTERVAL`: 60 minutes (won't spam backups even if you save frequently)
+- `MEMORY_BACKUP_KEEP`: 24 copies = 1 day of history
+
+**Examples:**
+- Save at 9:00 AM → backup created
+- Save at 9:30 AM → no backup (only 30 min passed)
+- Save at 10:15 AM → backup created (60+ min passed)
+- No activity for 5 hours → no backups (saves space)
+
 ### Multiple Database Instances
 
-You can run multiple instances with different database files:
+Run multiple instances with different database files:
 
 ```json
 {

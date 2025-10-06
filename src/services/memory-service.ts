@@ -4,6 +4,7 @@ import { resolve } from 'path';
 import { debugLog, debugLogHash } from '../utils/debug.js';
 import { runMigrations } from './migrations.js';
 import { DatabaseOptimizer } from './database-optimizer.js';
+import { BackupService, BackupConfig } from './backup-service.js';
 
 export interface MemoryEntry {
   id: number;
@@ -39,6 +40,7 @@ export class MemoryService {
   private resolvedDbPath: string;
   private stmts!: Record<string, Database.Statement>;
   private maxContentSize: number = 1024 * 1024; // 1MB default
+  private backup?: BackupService;
 
   constructor(dbPath: string = 'memory.db', maxContentSize?: number) {
     this.dbPath = dbPath;
@@ -46,12 +48,28 @@ export class MemoryService {
     
     // Cache resolved path once
     this.resolvedDbPath = resolve(dbPath);
+    
+    // Auto-configure backup if env vars are set
+    const backupPath = process.env.MEMORY_BACKUP_PATH;
+    if (backupPath) {
+      this.backup = new BackupService(dbPath, {
+        backupPath,
+        autoBackupInterval: parseInt(process.env.MEMORY_BACKUP_INTERVAL || '0', 10),
+        maxBackups: parseInt(process.env.MEMORY_BACKUP_KEEP || '10', 10)
+      });
+    }
   }
 
   initialize(): void {
     try {
       this.db = new Database(this.dbPath);
       this.initDb();
+      
+      // Create initial backup if configured (MCP server only)
+      if (this.backup) {
+        this.backup.initialize();
+      }
+      
       debugLog('MemoryService initialized with database:', this.dbPath);
     } catch (error: any) {
       throw new Error(`Failed to initialize database: ${error.message}`);
@@ -252,6 +270,10 @@ export class MemoryService {
       
       const resultHash = insertMemory();
       debugLogHash('MemoryService: Stored memory with hash:', hash);
+      
+      // Backup if needed (lazy, throttled)
+      this.backup?.backupIfNeeded();
+      
       return resultHash;
     } catch (error: any) {
       if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
@@ -328,6 +350,10 @@ export class MemoryService {
     const result = this.stmts.deleteByHash.run(hash);
     const deleted = result.changes > 0;
     debugLogHash('MemoryService: Delete by hash', hash, deleted ? 'success' : 'not found');
+    
+    // Backup if needed (lazy, throttled)
+    if (deleted) this.backup?.backupIfNeeded();
+    
     return deleted;
   }
 
@@ -343,6 +369,10 @@ export class MemoryService {
     const result = this.stmts.deleteByTag.run(normalizedTag);
     
     debugLog('MemoryService: Deleted', result.changes, 'memories with tag:', normalizedTag);
+    
+    // Backup if needed (lazy, throttled)
+    if (result.changes > 0) this.backup?.backupIfNeeded();
+    
     return result.changes;
   }
 
@@ -500,7 +530,7 @@ export class MemoryService {
   }
 
   /**
-   * Close the database connection
+   * Close database connection
    */
   close(): void {
     if (this.db) {
@@ -508,5 +538,41 @@ export class MemoryService {
       this.db = null;
       debugLog('MemoryService: Database connection closed');
     }
+  }
+
+  /**
+   * Create a manual backup
+   */
+  createBackup(label: string = 'manual'): string | null {
+    return this.backup?.backup(label) || null;
+  }
+
+  /**
+   * List all available backups
+   */
+  listBackups(): Array<{ name: string; path: string; size: number; created: Date }> {
+    return this.backup?.listBackups() || [];
+  }
+
+  /**
+   * Restore from a backup (requires restart after restore)
+   */
+  restoreFromBackup(backupPath: string): boolean {
+    if (!this.backup) return false;
+
+    // Close current connection
+    if (this.db) {
+      this.db.close();
+      this.db = null;
+    }
+
+    const success = this.backup.restore(backupPath);
+    
+    if (success) {
+      // Reinitialize with restored database
+      this.initialize();
+    }
+
+    return success;
   }
 }

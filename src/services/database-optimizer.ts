@@ -5,11 +5,22 @@ export class DatabaseOptimizer {
   /**
    * Apply SQLite performance optimizations
    * Safe to run multiple times (idempotent)
+   * 
+   * Set MEMORY_CLOUD_SAFE=true for OneDrive/Dropbox/cloud storage locations
    */
   static applyOptimizations(db: Database.Database): void {
-    // Enable Write-Ahead Logging for better concurrency
-    // WAL allows readers and writers to work simultaneously
-    db.pragma('journal_mode = WAL');
+    const isCloudSafe = process.env.MEMORY_CLOUD_SAFE === 'true';
+    
+    if (isCloudSafe) {
+      // Cloud-safe mode: Use DELETE journal (single file, no WAL shm/wal files)
+      db.pragma('journal_mode = DELETE');
+      debugLog('Database optimizations applied (CLOUD-SAFE MODE)');
+      debugLog('⚠️  Performance reduced for cloud storage compatibility');
+    } else {
+      // Performance mode: WAL allows readers and writers to work simultaneously
+      db.pragma('journal_mode = WAL');
+      debugLog('Database optimizations applied (PERFORMANCE MODE)');
+    }
     
     // Larger cache = fewer disk reads = faster queries (64MB)
     db.pragma('cache_size = -64000');
@@ -17,13 +28,11 @@ export class DatabaseOptimizer {
     // Store temp tables in memory (faster)
     db.pragma('temp_store = MEMORY');
     
-    // Balance between safety and speed
-    db.pragma('synchronous = NORMAL');
+    // Cloud-safe: Use FULL sync for maximum safety, else NORMAL for speed
+    db.pragma(isCloudSafe ? 'synchronous = FULL' : 'synchronous = NORMAL');
     
     // Enforce foreign key constraints
     db.pragma('foreign_keys = ON');
-    
-    debugLog('Database optimizations applied');
   }
   
   /**

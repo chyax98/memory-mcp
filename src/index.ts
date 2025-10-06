@@ -31,32 +31,24 @@ const server = new Server(
   }
 );
 
-// Initialize services and start server
+// Initialize services
 function initializeServices(): MemoryService {
-  let memoryService: MemoryService;
-
   try {
-    // Use environment variable or default path
     const dbPath = process.env.MEMORY_DB || './memory.db';
-    memoryService = new MemoryService(dbPath);
+    const memoryService = new MemoryService(dbPath);
     memoryService.initialize();
+    
     debugLog('Memory service initialized');
+    return memoryService;
   } catch (error) {
     console.error('Failed to initialize services:', error);
     process.exit(1);
   }
-
-  return memoryService;
 }
 
-// Initialize and get memory service
-const memoryService = initializeServices();
-
-// Create tool context
-const toolContext: ToolContext = {
-  memoryService,
-  config: {}
-};
+// Global references (initialized in main())
+let memoryService: MemoryService;
+let toolContext: ToolContext;
 
 // List available tools
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -123,6 +115,15 @@ server.setRequestHandler(GetPromptRequestSchema, async (request) => {
 // Start server or run CLI
 async function main() {
   const args = process.argv.slice(2);
+  
+  // Initialize services (backup auto-configures from env vars)
+  memoryService = initializeServices();
+  
+  // Create tool context
+  toolContext = {
+    memoryService,
+    config: {}
+  };
   
   if (args.length > 0) {
     // CLI mode
