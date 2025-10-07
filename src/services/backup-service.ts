@@ -41,23 +41,39 @@ export class BackupService {
   private initializeLastBackupTime(): void {
     try {
       if (!existsSync(this.config.backupPath)) {
+        debugLog(`Backup path does not exist yet: ${this.config.backupPath}`);
         return;
       }
 
       const files = readdirSync(this.config.backupPath)
         .filter(f => f.endsWith('.db') && f.includes('_auto'))
-        .map(f => ({
-          path: join(this.config.backupPath, f),
-          time: statSync(join(this.config.backupPath, f)).mtime.getTime()
-        }))
+        .map(f => {
+          const filePath = join(this.config.backupPath, f);
+          const stats = statSync(filePath);
+          return {
+            name: f,
+            path: filePath,
+            time: stats.mtime.getTime(),
+            mtimeDate: stats.mtime
+          };
+        })
         .sort((a, b) => b.time - a.time); // Newest first
 
       if (files.length > 0) {
-        this.lastBackupTime = files[0].time;
-        debugLog(`Last backup was at ${new Date(this.lastBackupTime).toISOString()}`);
+        const mostRecent = files[0];
+        this.lastBackupTime = mostRecent.time;
+        const now = Date.now();
+        const ageMinutes = Math.floor((now - this.lastBackupTime) / 60000);
+        debugLog(`📁 Found ${files.length} existing auto backup(s)`);
+        debugLog(`📅 Most recent: ${mostRecent.name}`);
+        debugLog(`🕐 Last backup time: ${new Date(this.lastBackupTime).toISOString()}`);
+        debugLog(`🕐 Current time: ${new Date(now).toISOString()}`);
+        debugLog(`⏱️  Age: ${ageMinutes} minutes (${Math.floor((now - this.lastBackupTime) / 1000)} seconds)`);
+      } else {
+        debugLog(`No existing auto backups found in ${this.config.backupPath}`);
       }
     } catch (error: any) {
-      // Ignore errors, we'll just start fresh
+      debugLog(`Warning: Could not initialize last backup time: ${error.message}`);
     }
   }
 
@@ -125,15 +141,27 @@ export class BackupService {
    * Call this after write operations (store, delete)
    */
   shouldBackup(): boolean {
+    const now = Date.now();
+    const timeSinceLastBackupMs = now - this.lastBackupTime;
+    const timeSinceLastBackupMinutes = Math.floor(timeSinceLastBackupMs / 60000);
+    const timeSinceLastBackupSeconds = Math.floor(timeSinceLastBackupMs / 1000);
+
     // If interval is 0, backup on every write
     if (!this.config.autoBackupInterval || this.config.autoBackupInterval <= 0) {
+      debugLog(`⚡ Backup check: interval=0, backup on every write`);
       return true;
     }
 
     const intervalMs = this.config.autoBackupInterval * 60 * 1000;
-    const timeSinceLastBackup = Date.now() - this.lastBackupTime;
+    const shouldBackupNow = timeSinceLastBackupMs >= intervalMs;
     
-    return timeSinceLastBackup >= intervalMs;
+    debugLog(`⏱️  Backup check: interval=${this.config.autoBackupInterval}min (${intervalMs}ms)`);
+    debugLog(`   Last backup: ${this.lastBackupTime === 0 ? 'never' : new Date(this.lastBackupTime).toISOString()}`);
+    debugLog(`   Current time: ${new Date(now).toISOString()}`);
+    debugLog(`   Time since last: ${timeSinceLastBackupMinutes}min ${timeSinceLastBackupSeconds % 60}s (${timeSinceLastBackupMs}ms)`);
+    debugLog(`   Should backup: ${shouldBackupNow ? '✅ YES' : '❌ NO'}`);
+    
+    return shouldBackupNow;
   }
 
   /**
@@ -141,13 +169,15 @@ export class BackupService {
    */
   backupIfNeeded(): string | null {
     if (this.shouldBackup()) {
+      debugLog(`🔄 Creating lazy backup...`);
       return this.backup('auto');
     }
+    debugLog(`⏭️  Skipping backup (not enough time passed)`);
     return null;
   }
 
   /**
-   * Initialize lazy backup mode (creates initial backup)
+   * Initialize lazy backup mode (creates initial backup if needed)
    * Backups will be created on write operations when interval has passed
    */
   initialize(): void {
@@ -158,8 +188,13 @@ export class BackupService {
       debugLog(`Lazy backup enabled: will backup on every write`);
     }
     
-    // Create initial backup immediately
-    this.backup('auto-initial');
+    // Only create initial backup if we should (respects throttling)
+    if (this.shouldBackup()) {
+      debugLog(`🔄 Creating initial backup...`);
+      this.backup('auto-initial');
+    } else {
+      debugLog(`⏭️  Skipping initial backup (recent backup exists)`);
+    }
   }
 
   /**

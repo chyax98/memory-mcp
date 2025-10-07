@@ -23,7 +23,9 @@
     "test:perf": "npm run build && node dist/tests/performance-test.js",
     "test:migration": "npm run build && node dist/tests/migration-test.js",
     "test:all": "npm run test && npm run test:perf",
-    "benchmark": "npm run build && node dist/tests/performance-benchmark.js"
+    "benchmark": "npm run build && node dist/tests/performance-benchmark.js",
+    "link": "npm run build && npm link",
+    "unlink": "npm unlink -g"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.3",

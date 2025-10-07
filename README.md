@@ -52,13 +52,15 @@ npm install -g simple-memory-mcp
 git clone https://github.com/chrisribe/simple-memory-mcp.git
 cd simple-memory-mcp
 npm install
-npm run build
 
-# Create a global symlink
-npm link
+# Link globally (builds automatically)
+npm run link
 
 # Now 'simple-memory' command works globally!
 simple-memory memory-stats
+
+# To unlink later
+npm run unlink
 ```
 
 > 💡 **What's the difference?** Option A installs from npm's registry (not available yet). Option B creates a symlink to your local code, perfect for testing and development. Both make the `simple-memory` command available globally.
@@ -372,9 +374,14 @@ npm run test:migration # Migration tests (13 tests)
 # Performance benchmarks
 npm run benchmark
 
-# Link globally for testing
-npm link
-simple-memory memory-stats
+# Link/unlink globally for testing
+npm run link          # Build and link globally (makes 'simple-memory' command available)
+npm run unlink        # Remove global link
+
+# Or manually
+npm link              # Link current directory globally
+npm unlink -g         # Unlink from global
+simple-memory memory-stats  # Test the global command
 ```
 
 ### Testing
