@@ -12,6 +12,7 @@ Perfect for AI assistants that need to remember context across conversations, st
 
 ## ✨ Features
 
+- 🧠 **Auto-Capture** - LLM proactively stores important information during conversations
 - 🚀 **Sub-millisecond Performance** - 2,000-10,000 operations/second
 - 🔍 **Full-Text Search** - SQLite FTS5 with 0.14ms average query time
 - 🏷️ **Smart Tagging** - Organize and filter memories with tags
@@ -102,12 +103,21 @@ That's it! Start storing and retrieving memories with your AI assistant.
 
 ### As MCP Server
 
-The server exposes tools that your AI assistant can use directly. Once configured, you can ask your assistant to:
+The server exposes tools that your AI assistant can use directly. Once configured, your assistant will:
 
+**🧠 Auto-Capture Mode** - Proactively store important information:
+- Preferences you mention ("I prefer dark mode")
+- Decisions you make ("Let's use PostgreSQL")
+- Facts about people, projects, or tools
+- Learnings and insights you discover
+
+**📝 Manual Storage** - You can also explicitly ask:
 - "Remember that I prefer dark mode"
 - "Store this meeting summary with tags project and planning"
 - "Search my memories for Python tips"
 - "Show me all memories tagged with 'important'"
+
+The assistant stores memories silently and retrieves them when relevant, creating a seamless conversation experience.
 
 ### Command Line Interface
 
@@ -137,6 +147,12 @@ simple-memory delete-memory --tag "old-notes"
 ### `store-memory`
 Store content with optional tags.
 
+**🧠 Auto-Capture:** This tool is enhanced with guidelines that encourage your AI assistant to proactively store important information during conversations without explicit requests. The assistant learns to:
+- Capture preferences, decisions, and facts automatically
+- Store silently without announcing
+- Use descriptive tags for easy retrieval
+- Link related memories intelligently
+
 **Parameters:**
 - `content` (string, required) - The text content to store
 - `tags` (array, optional) - Tags to associate with the memory
@@ -153,6 +169,8 @@ Store content with optional tags.
 
 ### `search-memory`
 Search stored memories by content or tags.
+
+**💡 Proactive Usage:** Enhanced with guidance for your AI assistant to search memories proactively at conversation start or when relevant topics arise, providing personalized context-aware responses.
 
 **Parameters:**
 - `query` (string, optional) - Text to search for in content
