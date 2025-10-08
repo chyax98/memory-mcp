@@ -135,6 +135,12 @@ simple-memory search-memory --query "search term"
 # Search by tags
 simple-memory search-memory --tags "tag1,tag2"
 
+# Search memories from last week
+simple-memory search-memory --query "project" --days-ago 7
+
+# Search memories from specific date range
+simple-memory search-memory --start-date "2025-01-01" --end-date "2025-01-31"
+
 # View statistics
 simple-memory memory-stats
 
@@ -170,7 +176,7 @@ Store content with optional tags.
 ```
 
 ### `search-memory`
-Search stored memories by content or tags.
+Search stored memories by content or tags, with optional time range filtering.
 
 **💡 Proactive Usage:** Enhanced with guidance for your AI assistant to search memories proactively at conversation start or when relevant topics arise, providing personalized context-aware responses.
 
@@ -179,14 +185,30 @@ Search stored memories by content or tags.
 - `tags` (array, optional) - Filter by tags
 - `limit` (number, optional) - Max results to return (default: 10)
 - `includeRelated` (boolean, optional) - Include related memories (default: false)
+- `daysAgo` (number, optional) - Filter memories created within last N days (e.g., 7 for last week)
+- `startDate` (string, optional) - Filter memories created on or after this date (ISO 8601: YYYY-MM-DD)
+- `endDate` (string, optional) - Filter memories created on or before this date (ISO 8601: YYYY-MM-DD)
 
 **Example:**
 ```json
 {
   "query": "TypeScript",
   "tags": ["coding"],
-  "limit": 5
+  "limit": 5,
+  "daysAgo": 7
 }
+```
+
+**Time Range Examples:**
+```json
+// Find memories from last week
+{ "query": "project update", "daysAgo": 7 }
+
+// Find memories from specific date range
+{ "startDate": "2025-01-01", "endDate": "2025-01-31" }
+
+// Find recent memories with specific tags
+{ "tags": ["bug"], "daysAgo": 3 }
 ```
 
 ### `delete-memory`
