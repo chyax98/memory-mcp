@@ -295,15 +295,53 @@ export class MemoryService {
   /**
    * Search memories by content or tags
    */
-  search(query?: string, tags?: string[], limit: number = 10): MemoryEntry[] {
+  search(
+    query?: string, 
+    tags?: string[], 
+    limit: number = 10,
+    daysAgo?: number,
+    startDate?: string,
+    endDate?: string
+  ): MemoryEntry[] {
     let results: any[];
+
+    // Calculate date boundaries for filtering
+    let minDate: Date | undefined;
+    let maxDate: Date | undefined;
+    
+    if (daysAgo !== undefined && daysAgo >= 0) {
+      // Convert daysAgo to a start date (N days ago from now)
+      minDate = new Date();
+      minDate.setDate(minDate.getDate() - daysAgo);
+      minDate.setHours(0, 0, 0, 0); // Start of day
+    }
+    
+    if (startDate) {
+      // Parse start date (supports both YYYY-MM-DD and full ISO strings)
+      const parsed = new Date(startDate);
+      if (!isNaN(parsed.getTime())) {
+        minDate = parsed;
+      }
+    }
+    
+    if (endDate) {
+      // Parse end date (supports both YYYY-MM-DD and full ISO strings)
+      const parsed = new Date(endDate);
+      if (!isNaN(parsed.getTime())) {
+        maxDate = parsed;
+        // Set to end of day if only date provided (no time component)
+        if (endDate.length === 10) { // YYYY-MM-DD format
+          maxDate.setHours(23, 59, 59, 999);
+        }
+      }
+    }
 
     if (query) {
       // Use FTS for text search
       let ftsResults: any[];
       // FTS5 requires proper escaping for special characters
       const escapedQuery = `"${query.replace(/"/g, '""')}"`;
-      ftsResults = this.stmts.searchText.all(escapedQuery, limit);
+      ftsResults = this.stmts.searchText.all(escapedQuery, limit * 2); // Fetch more to allow for filtering
       
       // Hydrate with tags from tags table
       results = ftsResults.map((row: any) => {
@@ -316,7 +354,7 @@ export class MemoryService {
     } else if (tags && tags.length > 0) {
       // Fast indexed tag search using normalized tags table
       const normalizedTag = tags[0].trim().toLowerCase();
-      const tagResults = this.stmts.searchByTag.all(normalizedTag, limit);
+      const tagResults = this.stmts.searchByTag.all(normalizedTag, limit * 2); // Fetch more to allow for filtering
       
       // Hydrate with all tags for each memory
       results = tagResults.map((row: any) => {
@@ -328,7 +366,7 @@ export class MemoryService {
       });
     } else {
       // Get recent memories
-      const recentResults = this.stmts.getRecent.all(limit);
+      const recentResults = this.stmts.getRecent.all(limit * 2); // Fetch more to allow for filtering
       
       // Hydrate with tags
       results = recentResults.map((row: any) => {
@@ -339,6 +377,19 @@ export class MemoryService {
         };
       });
     }
+
+    // Apply date filtering if needed
+    if (minDate || maxDate) {
+      results = results.filter((row: any) => {
+        const createdAt = new Date(row.created_at);
+        if (minDate && createdAt < minDate) return false;
+        if (maxDate && createdAt > maxDate) return false;
+        return true;
+      });
+    }
+
+    // Apply limit after filtering
+    results = results.slice(0, limit);
 
     // Convert to MemoryEntry format
     const memories = results.map(row => ({

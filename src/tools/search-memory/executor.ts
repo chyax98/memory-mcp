@@ -7,6 +7,9 @@ interface SearchMemoryArgs {
   limit?: number;
   includeRelated?: boolean;
   relationshipDepth?: number;
+  daysAgo?: number;
+  startDate?: string;
+  endDate?: string;
 }
 
 interface SearchMemoryResult {
@@ -22,7 +25,14 @@ export async function execute(args: SearchMemoryArgs, context: ToolContext): Pro
   // Use provided limit or default to 10, ensure it's at least 1
   const limit = Math.max(1, args.limit || 10);
 
-  const memories = context.memoryService.search(args.query, args.tags, limit);
+  const memories = context.memoryService.search(
+    args.query, 
+    args.tags, 
+    limit,
+    args.daysAgo,
+    args.startDate,
+    args.endDate
+  );
   const result: SearchMemoryResult = {
     memories,
     total: memories.length,
