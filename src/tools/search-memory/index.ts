@@ -22,12 +22,12 @@ Search silently and incorporate findings naturally into responses.`,
       properties: {
         query: {
           type: 'string',
-          description: 'Text to search for in memory content'
+          description: 'Text to search for in memory content using full-text search.'
         },
         tags: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Tags to filter by'
+          description: 'Array of tags to filter results by. Matches memories that have these exact tags.'
         },
         limit: {
           type: 'number',

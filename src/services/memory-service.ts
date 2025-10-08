@@ -300,7 +300,10 @@ export class MemoryService {
 
     if (query) {
       // Use FTS for text search
-      const ftsResults = this.stmts.searchText.all(query, limit);
+      let ftsResults: any[];
+      // FTS5 requires proper escaping for special characters
+      const escapedQuery = `"${query.replace(/"/g, '""')}"`;
+      ftsResults = this.stmts.searchText.all(escapedQuery, limit);
       
       // Hydrate with tags from tags table
       results = ftsResults.map((row: any) => {
