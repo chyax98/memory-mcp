@@ -2,11 +2,27 @@ import Database from 'better-sqlite3';
 import { createHash } from 'crypto';
 import { hostname } from 'os';
 import { resolve } from 'path';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import { debugLog, debugLogHash } from '../utils/debug.js';
 import { runMigrations } from './migrations.js';
 import { DatabaseOptimizer } from './database-optimizer.js';
 import { BackupService, BackupConfig } from './backup-service.js';
 import type { ExportFilters, ImportOptions, ImportResult, ExportFormat, ExportedMemory } from '../types/tools.js';
+
+// Get package version for export metadata
+function getPackageVersion(): string {
+  try {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const packagePath = join(__dirname, '..', '..', 'package.json');
+    const packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'));
+    return packageJson.version || '1.0.0';
+  } catch {
+    return '1.0.0'; // Fallback version
+  }
+}
 
 export interface MemoryEntry {
   id: number;
@@ -719,7 +735,7 @@ export class MemoryService {
 
     return {
       exportedAt: new Date().toISOString(),
-      exportVersion: '1.0',
+      exportVersion: getPackageVersion(),
       source: hostname(),
       totalMemories: exportedMemories.length,
       memories: exportedMemories
