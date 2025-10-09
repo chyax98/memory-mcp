@@ -5,6 +5,7 @@ import { debugLog, debugLogHash } from '../utils/debug.js';
 import { runMigrations } from './migrations.js';
 import { DatabaseOptimizer } from './database-optimizer.js';
 import { BackupService, BackupConfig } from './backup-service.js';
+import type { ExportFilters, ImportOptions, ImportResult, ExportFormat, ExportedMemory } from '../types/tools.js';
 
 export interface MemoryEntry {
   id: number;
@@ -112,6 +113,27 @@ export class MemoryService {
         FOREIGN KEY (to_memory_id) REFERENCES memories (id) ON DELETE CASCADE,
         UNIQUE(from_memory_id, to_memory_id, relationship_type)
       )
+    `);
+
+    // Create normalized tags table for efficient tag queries
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS tags (
+        memory_id INTEGER NOT NULL,
+        tag TEXT NOT NULL,
+        FOREIGN KEY (memory_id) REFERENCES memories (id) ON DELETE CASCADE,
+        PRIMARY KEY (memory_id, tag)
+      )
+    `);
+
+    // Create indexes for performance
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_tags_tag ON tags(tag);
+      CREATE INDEX IF NOT EXISTS idx_tags_memory_id ON tags(memory_id);
+      CREATE INDEX IF NOT EXISTS idx_memories_created_at ON memories(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_memories_hash ON memories(hash);
+      CREATE INDEX IF NOT EXISTS idx_relationships_from ON relationships(from_memory_id);
+      CREATE INDEX IF NOT EXISTS idx_relationships_to ON relationships(to_memory_id);
+      CREATE INDEX IF NOT EXISTS idx_relationships_composite ON relationships(from_memory_id, to_memory_id);
     `);
 
     // Create FTS table for fast text search (content only, tags in separate table)
@@ -655,5 +677,220 @@ export class MemoryService {
     }
 
     return success;
+  }
+
+  /**
+   * Export memories to JSON format with optional filtering
+   */
+  exportMemories(filters?: ExportFilters): ExportFormat {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    // Use existing search method to get memories
+    const memories = this.search(
+      filters?.limit ? '' : undefined, // empty query to get all if limit specified
+      filters?.tags,
+      filters?.limit || 1000, // default high limit for export
+      undefined, // daysAgo
+      filters?.startDate?.toISOString(),
+      filters?.endDate?.toISOString()
+    );
+    
+    // Get relationships for each memory
+    const exportedMemories: ExportedMemory[] = memories.map((memory: MemoryEntry) => {
+      const relationships = this.getMemoryRelationships(memory.id);
+      
+      return {
+        id: memory.id,
+        content: memory.content,
+        tags: memory.tags,
+        createdAt: memory.createdAt,
+        hash: memory.hash,
+        relationships: relationships.length > 0 ? relationships.map(rel => ({
+          relatedMemoryHash: rel.relatedMemoryHash,
+          relatedMemoryId: rel.relatedMemoryId,
+          relationshipType: rel.relationshipType
+        })) : undefined
+      };
+    });
+
+    return {
+      exportedAt: new Date().toISOString(),
+      exportVersion: '1.0',
+      source: process.env.COMPUTERNAME || process.env.HOSTNAME || undefined,
+      totalMemories: exportedMemories.length,
+      memories: exportedMemories
+    };
+  }
+
+  /**
+   * Import memories from JSON format
+   */
+  importMemories(jsonData: string, options?: ImportOptions): ImportResult {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    const result: ImportResult = {
+      imported: 0,
+      skipped: 0,
+      errors: []
+    };
+
+    let exportData: ExportFormat;
+    try {
+      exportData = JSON.parse(jsonData);
+    } catch (error: any) {
+      throw new Error(`Invalid JSON format: ${error.message}`);
+    }
+
+    // Validate export format
+    if (!exportData.memories || !Array.isArray(exportData.memories)) {
+      throw new Error('Invalid export format: missing memories array');
+    }
+
+    debugLog(`Importing ${exportData.totalMemories} memories from export version ${exportData.exportVersion}`);
+
+    for (const memory of exportData.memories) {
+      try {
+        // Check for duplicates by hash
+        if (options?.skipDuplicates) {
+          const existing = this.getMemoryByHash(memory.hash);
+          if (existing) {
+            result.skipped++;
+            debugLog(`Skipped duplicate memory: ${memory.hash}`);
+            continue;
+          }
+        }
+
+        // Store memory (without relationships for now)
+        const stored = this.store(
+          memory.content,
+          memory.tags
+        );
+
+        if (stored) {
+          result.imported++;
+          debugLog(`Imported memory: ${stored}`);
+        }
+      } catch (error: any) {
+        result.errors.push({
+          memory: memory,
+          error: error.message
+        });
+        debugLog(`Error importing memory ${memory.hash}: ${error.message}`);
+      }
+    }
+
+    // Second pass: restore relationships
+    if (result.imported > 0) {
+      this.restoreRelationships(exportData.memories);
+    }
+
+    debugLog(`Import complete: ${result.imported} imported, ${result.skipped} skipped, ${result.errors.length} errors`);
+    
+    // Trigger backup after import if enabled
+    if (this.backup && result.imported > 0) {
+      this.backup.backupIfNeeded();
+    }
+
+    return result;
+  }
+
+  /**
+   * Get relationships for a memory
+   */
+  private getMemoryRelationships(memoryId: number): Array<{
+    relatedMemoryHash: string;
+    relatedMemoryId: number;
+    relationshipType: string;
+  }> {
+    if (!this.db) return [];
+
+    const stmt = this.db.prepare(`
+      SELECT 
+        r.to_memory_id as relatedMemoryId,
+        r.relationship_type as relationshipType,
+        m.hash as relatedMemoryHash
+      FROM relationships r
+      JOIN memories m ON m.id = r.to_memory_id
+      WHERE r.from_memory_id = ?
+    `);
+
+    const relationships = stmt.all(memoryId) as any[];
+    
+    return relationships.map(rel => ({
+      relatedMemoryHash: rel.relatedMemoryHash,
+      relatedMemoryId: rel.relatedMemoryId,
+      relationshipType: rel.relationshipType
+    }));
+  }
+
+  /**
+   * Restore relationships after importing memories
+   */
+  private restoreRelationships(memories: ExportedMemory[]): void {
+    if (!this.db) return;
+
+    let restoredCount = 0;
+
+    for (const memory of memories) {
+      if (!memory.relationships || memory.relationships.length === 0) continue;
+
+      // Find the imported memory by hash
+      const fromMemory = this.getMemoryByHash(memory.hash);
+      if (!fromMemory) continue;
+
+      for (const rel of memory.relationships) {
+        // Find the related memory by hash
+        const toMemory = this.getMemoryByHash(rel.relatedMemoryHash);
+        if (!toMemory) continue;
+
+        try {
+          // Create relationship
+          const stmt = this.db.prepare(`
+            INSERT OR IGNORE INTO relationships (from_memory_id, to_memory_id, relationship_type, created_at)
+            VALUES (?, ?, ?, ?)
+          `);
+          
+          const info = stmt.run(fromMemory.id, toMemory.id, rel.relationshipType, new Date().toISOString());
+          if (info.changes > 0) {
+            restoredCount++;
+          }
+        } catch (error: any) {
+          debugLog(`Warning: Could not restore relationship: ${error.message}`);
+        }
+      }
+    }
+
+    if (restoredCount > 0) {
+      debugLog(`Restored ${restoredCount} relationships`);
+    }
+  }
+
+  /**
+   * Get a memory by its hash
+   */
+  private getMemoryByHash(hash: string): MemoryEntry | null {
+    if (!this.db) return null;
+
+    const stmt = this.db.prepare(`
+      SELECT id, content, tags, created_at, hash
+      FROM memories
+      WHERE hash = ?
+    `);
+
+    const result = stmt.get(hash) as any;
+    
+    if (!result) return null;
+
+    return {
+      id: result.id,
+      content: result.content,
+      tags: result.tags ? result.tags.split(',') : [],
+      createdAt: result.created_at,
+      hash: result.hash
+    };
   }
 }
