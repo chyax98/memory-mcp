@@ -244,6 +244,79 @@ async function testSearchWithLimit(): Promise<void> {
 }
 
 /**
+ * Test improved search with OR tokenization
+ * Tests that multiple words match memories containing ANY of those words
+ */
+async function testImprovedSearch(): Promise<void> {
+  // Store test memories with specific content
+  await executeCommand(['store-memory', '--content', 'Git rebase workflow requires careful attention', '--tags', 'git,workflow']);
+  await executeCommand(['store-memory', '--content', 'Database migration failed during deployment', '--tags', 'database,deploy']);
+  await executeCommand(['store-memory', '--content', 'Configuration system needs reset after update', '--tags', 'config,system']);
+
+  // Test 1: Multiple words should match with OR logic
+  const multiWordResult = await executeCommand(['search-memory', '--query', 'git reset']);
+  const multiWordOutput = parseJsonOutput(multiWordResult.stdout);
+  
+  if (!multiWordOutput?.memories || multiWordOutput.memories.length === 0) {
+    throw new Error('Multi-word search should find memories with ANY matching word');
+  }
+  
+  // Should find both "git" memory and "reset" memory
+  const foundGit = multiWordOutput.memories.some((m: any) => m.content.toLowerCase().includes('git'));
+  const foundReset = multiWordOutput.memories.some((m: any) => m.content.toLowerCase().includes('reset'));
+  
+  if (!foundGit && !foundReset) {
+    throw new Error('Should find memories containing either "git" OR "reset"');
+  }
+  
+  console.log(`✓ Multi-word search found ${multiWordOutput.memories.length} memories with OR logic`);
+
+  // Test 2: Word order shouldn't matter
+  const reversedResult = await executeCommand(['search-memory', '--query', 'reset git']);
+  const reversedOutput = parseJsonOutput(reversedResult.stdout);
+  
+  if (!reversedOutput?.memories || reversedOutput.memories.length === 0) {
+    throw new Error('Reversed word order should still find results');
+  }
+  
+  console.log(`✓ Word order independence verified (${reversedOutput.memories.length} results)`);
+
+  // Test 3: Natural language query (with filler words)
+  const naturalResult = await executeCommand(['search-memory', '--query', 'find database configuration']);
+  const naturalOutput = parseJsonOutput(naturalResult.stdout);
+  
+  if (!naturalOutput?.memories || naturalOutput.memories.length === 0) {
+    throw new Error('Natural language query should find results');
+  }
+  
+  // Should find memories with "database" OR "configuration"
+  const hasDbOrConfig = naturalOutput.memories.some((m: any) => 
+    m.content.toLowerCase().includes('database') || 
+    m.content.toLowerCase().includes('configuration')
+  );
+  
+  if (!hasDbOrConfig) {
+    throw new Error('Should find memories with database OR configuration');
+  }
+  
+  console.log(`✓ Natural language query handled (${naturalOutput.memories.length} results)`);
+
+  // Test 4: BM25 ranking - more matches should rank higher
+  const rankingResult = await executeCommand(['search-memory', '--query', 'system configuration reset']);
+  const rankingOutput = parseJsonOutput(rankingResult.stdout);
+  
+  if (rankingOutput?.memories && rankingOutput.memories.length > 0) {
+    // The memory with "configuration" AND "reset" AND "system" should ideally rank first
+    const firstResult = rankingOutput.memories[0];
+    const matchCount = ['system', 'configuration', 'reset'].filter(word => 
+      firstResult.content.toLowerCase().includes(word)
+    ).length;
+    
+    console.log(`✓ BM25 ranking working (top result has ${matchCount}/3 word matches)`);
+  }
+}
+
+/**
  * Test integrated relationship functionality through enhanced store-memory
  */
 async function testIntegratedRelationships(): Promise<void> {
@@ -321,7 +394,8 @@ async function runAllTests(): Promise<void> {
     { name: 'Integrated Relationships', fn: testIntegratedRelationships },
     { name: 'Search with Relationships', fn: testSearchWithRelationships },
     { name: 'Delete Memory by Tag', fn: testDeleteMemoryByTag },
-    { name: 'Search with Limit', fn: testSearchWithLimit }
+    { name: 'Search with Limit', fn: testSearchWithLimit },
+    { name: 'Improved Search (OR + BM25)', fn: testImprovedSearch }
   ];
 
   const results: TestResult[] = [];

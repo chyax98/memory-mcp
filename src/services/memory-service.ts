@@ -198,12 +198,13 @@ export class MemoryService {
         WHERE id IN (SELECT memory_id FROM tags WHERE tag = ?)
       `),
       
-      // FTS search (updated to just query text)
+      // FTS search with BM25 ranking for relevance scoring
       searchText: this.db!.prepare(`
-        SELECT m.* FROM memories m
+        SELECT m.*, bm25(memories_fts) as rank
+        FROM memories m
         JOIN memories_fts fts ON m.id = fts.rowid
         WHERE memories_fts MATCH ?
-        ORDER BY m.created_at DESC
+        ORDER BY rank, m.created_at DESC
         LIMIT ?
       `),
       
@@ -339,8 +340,15 @@ export class MemoryService {
     if (query) {
       // Use FTS for text search
       let ftsResults: any[];
-      // FTS5 requires proper escaping for special characters
-      const escapedQuery = `"${query.replace(/"/g, '""')}"`;
+      // Tokenize query into words and join with OR for flexible matching
+      // This allows: "git reset" to match memories with either "git" OR "reset"
+      const words = query
+        .split(/\s+/)
+        .map(word => word.trim())
+        .filter(word => word.length > 0)
+        .map(word => `"${word.replace(/"/g, '""')}"`); // Quote each word for exact word matching
+      
+      const escapedQuery = words.length > 0 ? words.join(' OR ') : query.replace(/"/g, '""');
       ftsResults = this.stmts.searchText.all(escapedQuery, limit * 2); // Fetch more to allow for filtering
       
       // Hydrate with tags from tags table
