@@ -113,9 +113,32 @@ async function runTests() {
     unlinkSync('./test-limit.json');
     
     // ==========================================
-    // Test 4: Export with daysAgo
+    // Test 4: Export with Limit (No Tags) - Most Recent
     // ==========================================
-    console.log('\n📝 Test 4: Export with daysAgo (should get all since just created)');
+    console.log('\n📝 Test 4: Export with limit only (should get most recent memories)');
+    
+    const exportLimitOnlyResult = await toolRegistry.handle('export-memory', {
+      output: './test-limit-only.json',
+      limit: 3
+    }, exportContext);
+    
+    assert(exportLimitOnlyResult.success === true, 'Export with limit only succeeded');
+    assert(exportLimitOnlyResult.totalMemories === 3, 'Got 3 most recent memories');
+    
+    // Verify that we got the most recent memories (last 3 stored)
+    const { readFileSync } = await import('fs');
+    const limitOnlyData = JSON.parse(readFileSync('./test-limit-only.json', 'utf-8'));
+    const expectedContents = ['Learning about React hooks', 'Bug fix for authentication issue', 'Personal note about weekend plans'];
+    const actualContents = limitOnlyData.memories.map((m: any) => m.content);
+    const hasExpectedMemories = expectedContents.every(expected => actualContents.includes(expected));
+    assert(hasExpectedMemories, 'Export returned most recent memories (not FTS search)');
+    
+    unlinkSync('./test-limit-only.json');
+    
+    // ==========================================
+    // Test 5: Export with daysAgo
+    // ==========================================
+    console.log('\n📝 Test 5: Export with daysAgo (should get all since just created)');
     
     const exportDaysResult = await toolRegistry.handle('export-memory', {
       output: './test-days.json',
@@ -129,9 +152,9 @@ async function runTests() {
     exportService.close();
     
     // ==========================================
-    // Test 5: Import to New Database
+    // Test 6: Import to New Database
     // ==========================================
-    console.log('\n📝 Test 5: Import all memories to new database');
+    console.log('\n📝 Test 6: Import all memories to new database');
     
     const importService = new MemoryService(TEST_DB_IMPORT);
     importService.initialize();
@@ -155,9 +178,9 @@ async function runTests() {
     assert(importedMemories.length === 5, 'All 5 memories are searchable');
     
     // ==========================================
-    // Test 6: Import Duplicates (Skip)
+    // Test 7: Import Duplicates (Skip)
     // ==========================================
-    console.log('\n📝 Test 6: Import duplicates with skip-duplicates flag');
+    console.log('\n📝 Test 7: Import duplicates with skip-duplicates flag');
     
     const importDuplicatesResult = await toolRegistry.handle('import-memory', {
       input: TEST_JSON_ALL,
@@ -169,9 +192,9 @@ async function runTests() {
     assert(importDuplicatesResult.skipped === 5, 'All 5 duplicates skipped');
     
     // ==========================================
-    // Test 7: Relationship Preservation
+    // Test 8: Relationship Preservation
     // ==========================================
-    console.log('\n📝 Test 7: Verify relationship preservation');
+    console.log('\n📝 Test 8: Verify relationship preservation');
     
     // Check if relationships were restored
     const memoriesWithRelationships = importService.search('TypeScript', undefined, 10);
@@ -181,9 +204,9 @@ async function runTests() {
     }
     
     // ==========================================
-    // Test 8: Import Filtered Export
+    // Test 9: Import Filtered Export
     // ==========================================
-    console.log('\n📝 Test 8: Import filtered export (work-only)');
+    console.log('\n📝 Test 9: Import filtered export (work-only)');
     
     // Create a fresh database for filtered import test
     const importFilteredService = new MemoryService('./test-filtered-import.db');
@@ -208,9 +231,9 @@ async function runTests() {
     unlinkSync('./test-filtered-import.db');
     
     // ==========================================
-    // Test 9: Export Metadata Validation
+    // Test 10: Export Metadata Validation
     // ==========================================
-    console.log('\n📝 Test 9: Validate export metadata');
+    console.log('\n📝 Test 10: Validate export metadata');
     
     const fs = await import('fs');
     const exportData = JSON.parse(fs.readFileSync(TEST_JSON_ALL, 'utf-8'));
@@ -224,9 +247,9 @@ async function runTests() {
     assert(Array.isArray(exportData.memories[0].tags), 'Memory has tags array');
     
     // ==========================================
-    // Test 10: Tag Filtering Accuracy
+    // Test 11: Tag Filtering Accuracy
     // ==========================================
-    console.log('\n📝 Test 10: Verify tag filtering accuracy');
+    console.log('\n📝 Test 11: Verify tag filtering accuracy');
     
     const workOnlyData = JSON.parse(fs.readFileSync(TEST_JSON_FILTERED, 'utf-8'));
     const allHaveWorkTag = workOnlyData.memories.every((m: any) => m.tags.includes('work'));

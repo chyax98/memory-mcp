@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import { createHash } from 'crypto';
+import { hostname } from 'os';
 import { resolve } from 'path';
 import { debugLog, debugLogHash } from '../utils/debug.js';
 import { runMigrations } from './migrations.js';
@@ -688,8 +689,9 @@ export class MemoryService {
     }
 
     // Use existing search method to get memories
+    // Pass undefined for query to use tag search (if tags provided) or recent search (if no filters)
     const memories = this.search(
-      filters?.limit ? '' : undefined, // empty query to get all if limit specified
+      undefined, // query - let search decide based on tags
       filters?.tags,
       filters?.limit || 1000, // default high limit for export
       undefined, // daysAgo
@@ -718,7 +720,7 @@ export class MemoryService {
     return {
       exportedAt: new Date().toISOString(),
       exportVersion: '1.0',
-      source: process.env.COMPUTERNAME || process.env.HOSTNAME || undefined,
+      source: hostname(),
       totalMemories: exportedMemories.length,
       memories: exportedMemories
     };
