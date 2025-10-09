@@ -46,6 +46,19 @@ Search silently and incorporate findings naturally into responses.`,
           default: 1,
           minimum: 1,
           maximum: 3
+        },
+        daysAgo: {
+          type: 'number',
+          description: 'Filter memories created within the last N days. Example: 7 for last week, 30 for last month.',
+          minimum: 0
+        },
+        startDate: {
+          type: 'string',
+          description: 'Filter memories created on or after this date (ISO 8601 format: YYYY-MM-DD or full ISO string).'
+        },
+        endDate: {
+          type: 'string',
+          description: 'Filter memories created on or before this date (ISO 8601 format: YYYY-MM-DD or full ISO string).'
         }
       }
     }

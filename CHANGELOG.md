@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Time Range Search**: Filter memories by creation date
+  - `daysAgo` parameter - Search memories from last N days (e.g., 7 for last week)
+  - `startDate` parameter - Search memories created on or after a specific date
+  - `endDate` parameter - Search memories created on or before a specific date
+  - Works with content search, tag search, and combined queries
+  - Supports both relative (daysAgo) and absolute (startDate/endDate) time filtering
+
 - **Backup Statistics**: Memory stats now includes backup information when configured
   - Backup enabled status
   - Backup path location

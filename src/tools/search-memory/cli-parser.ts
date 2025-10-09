@@ -26,6 +26,15 @@ export function parseCliArgs(args: string[]) {
     const depth = rawArgs.relationshipDepth as number;
     result.relationshipDepth = Math.min(Math.max(depth, 1), 3); // Clamp between 1-3
   }
+  if (rawArgs.daysAgo !== undefined) {
+    result.daysAgo = rawArgs.daysAgo; // Already a number
+  }
+  if (rawArgs.startDate) {
+    result.startDate = rawArgs.startDate as string;
+  }
+  if (rawArgs.endDate) {
+    result.endDate = rawArgs.endDate as string;
+  }
   
   return result;
 }
