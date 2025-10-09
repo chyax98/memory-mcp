@@ -48,3 +48,44 @@ export interface Tool {
   cliMetadata?: ToolCliMetadata; // Optional CLI metadata
 }
 
+// Export/Import feature types
+export interface ExportFilters {
+  tags?: string[];
+  startDate?: Date;
+  endDate?: Date;
+  limit?: number;
+}
+
+export interface ImportOptions {
+  skipDuplicates?: boolean;
+  preserveTimestamps?: boolean;
+  preserveIds?: boolean;
+}
+
+export interface ImportResult {
+  imported: number;
+  skipped: number;
+  errors: Array<{ memory: any; error: string }>;
+}
+
+export interface ExportFormat {
+  exportedAt: string;
+  exportVersion: string;
+  source?: string;
+  totalMemories: number;
+  memories: ExportedMemory[];
+}
+
+export interface ExportedMemory {
+  id: number;
+  content: string;
+  tags: string[];
+  createdAt: string;
+  hash: string;
+  relationships?: Array<{
+    relatedMemoryHash: string;
+    relatedMemoryId?: number;
+    relationshipType: string;
+  }>;
+}
+

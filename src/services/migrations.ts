@@ -174,6 +174,9 @@ export function runMigrations(db: Database.Database, dbPath: string): void {
   const result = db.prepare('SELECT MAX(version) as version FROM schema_migrations').get() as any;
   const currentVersion = result?.version || 0;
   
+  // Check if this is a fresh database (no migrations recorded)
+  const isFreshDatabase = currentVersion === 0;
+  
   // Find pending migrations
   const pendingMigrations = migrations.filter(m => m.version > currentVersion);
   
@@ -182,9 +185,35 @@ export function runMigrations(db: Database.Database, dbPath: string): void {
     return;
   }
   
-  debugLog(`Found ${pendingMigrations.length} pending migration(s)`);
+  // For fresh databases, mark as current version without running migrations
+  // since initDb() already creates the latest schema
+  if (isFreshDatabase) {
+    const latestVersion = Math.max(...migrations.map(m => m.version));
+    debugLog(`Fresh database detected - marking as schema version ${latestVersion}`);
+    
+    const recordMigration = db.prepare(
+      'INSERT INTO schema_migrations (version, description, applied_at) VALUES (?, ?, ?)'
+    );
+    
+    const markAsCurrent = db.transaction(() => {
+      for (const migration of migrations) {
+        recordMigration.run(
+          migration.version, 
+          migration.description + ' (baseline)', 
+          new Date().toISOString()
+        );
+      }
+    });
+    
+    markAsCurrent();
+    debugLog('Database schema initialized at latest version');
+    return;
+  }
   
-  // Create backup before any changes
+  // For existing databases, run actual migrations
+  debugLog(`Found ${pendingMigrations.length} pending migration(s) for existing database`);
+  
+  // Create backup before any changes (only for existing databases)
   createBackup(dbPath);
   
   // Record migration in tracking table

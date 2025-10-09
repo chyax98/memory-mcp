@@ -7,6 +7,8 @@ import { storeMemoryTool } from './store-memory/index.js';
 import { searchMemoryTool } from './search-memory/index.js';
 import { deleteMemoryTool } from './delete-memory/index.js';
 import { memoryStatsTool } from './memory-stats/index.js';
+import { exportMemoryTool } from './export-memory/index.js';
+import { importMemoryTool } from './import-memory/index.js';
 
 export class ToolRegistry {
   private tools: Map<string, Tool> = new Map();
@@ -17,6 +19,8 @@ export class ToolRegistry {
     this.registerTool(searchMemoryTool);
     this.registerTool(deleteMemoryTool);
     this.registerTool(memoryStatsTool);
+    this.registerTool(exportMemoryTool);
+    this.registerTool(importMemoryTool);
   }
 
   private registerTool(tool: Tool): void {
