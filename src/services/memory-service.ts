@@ -40,6 +40,7 @@ export interface MemoryRelationship {
 }
 
 export interface MemoryStats {
+  version: string; // simple-memory-mcp version
   totalMemories: number;
   totalRelationships: number;
   dbSize: number;
@@ -606,6 +607,7 @@ export class MemoryService {
     const schemaVersion = versionResult?.version || 0;
     
     const stats: MemoryStats = {
+      version: getPackageVersion(),
       totalMemories: memoryCount.count,
       totalRelationships: relationshipCount.count,
       dbSize: (this.db.pragma('page_size', { simple: true }) as number) * 
