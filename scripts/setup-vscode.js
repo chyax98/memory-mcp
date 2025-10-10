@@ -53,14 +53,14 @@ function configureVSCode(name, vscodeUserPath) {
   console.log(`\n✅ ${name} detected!`);
   
   let mcpConfig = {};
-  let serversProp = 'mcpServers'; // Default for VS Code stable
+  let serversProp = 'servers'; // Both stable and Insiders use "servers"
   
   // Read existing mcp.json if it exists
   if (existsSync(mcpJsonPath)) {
     try {
       mcpConfig = JSON.parse(readFileSync(mcpJsonPath, 'utf8'));
       
-      // Detect which property is used (Insiders uses "servers", stable uses "mcpServers")
+      // Detect which property is used (both versions use "servers")
       if (mcpConfig.servers) {
         serversProp = 'servers';
       } else if (mcpConfig.mcpServers) {
@@ -76,7 +76,7 @@ function configureVSCode(name, vscodeUserPath) {
       return { success: false, reason: 'parse-error' };
     }
   } else {
-    // New file - use mcpServers for stable, will be overridden if needed
+    // New file - use "servers" (standard format for both stable and Insiders)
     mcpConfig[serversProp] = {};
   }
   
