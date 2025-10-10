@@ -15,6 +15,22 @@ const MCP_CONFIG = {
   }
 };
 
+const MCP_CONFIG_WITH_COMMENTS = `{
+  "servers": {
+    "simple-memory-mcp": {
+      "command": "simple-memory"
+      // 💡 Customize with environment variables:
+      // "env": {
+      //   "MEMORY_DB": "/path/to/your/memory.db",
+      //   "MEMORY_BACKUP_PATH": "/path/to/backups",
+      //   "MEMORY_BACKUP_INTERVAL": "1440",
+      //   "DEBUG": "false"
+      // }
+      // See README for more options: https://github.com/chrisribe/simple-memory-mcp#configuration
+    }
+  }
+}`;
+
 function getVSCodeConfigPaths() {
   const platform = process.platform;
   const home = homedir();
@@ -83,7 +99,8 @@ function configureVSCode(name, vscodeUserPath) {
   // Check if already configured
   if (mcpConfig[serversProp]['simple-memory-mcp']) {
     console.log(`✅ Already configured in ${name}`);
-    return { success: true, reason: 'already-configured' };
+    console.log(`   💡 To customize: ${mcpJsonPath}`);
+    return { success: true, reason: 'already-configured', path: mcpJsonPath };
   }
   
   // Add simple-memory-mcp config
@@ -94,7 +111,7 @@ function configureVSCode(name, vscodeUserPath) {
     writeFileSync(mcpJsonPath, JSON.stringify(mcpConfig, null, 2), 'utf8');
     console.log(`✅ Added to ${name} mcp.json`);
     console.log(`   Location: ${mcpJsonPath}`);
-    return { success: true, reason: 'configured' };
+    return { success: true, reason: 'configured', path: mcpJsonPath };
   } catch (error) {
     console.error(`❌ Failed to update ${name} mcp.json:`, error.message);
     return { success: false, reason: 'write-error' };
@@ -105,6 +122,7 @@ function main() {
   const vscodeInstalls = getVSCodeConfigPaths();
   let configuredCount = 0;
   let foundCount = 0;
+  let mcpJsonPaths = [];
   
   console.log('\n🔧 Checking for VS Code installations...');
   
@@ -112,6 +130,9 @@ function main() {
     const result = configureVSCode(install.name, install.path);
     if (result.success) {
       foundCount++;
+      if (result.path) {
+        mcpJsonPaths.push(result.path);
+      }
       if (result.reason === 'configured') {
         configuredCount++;
       }
@@ -121,10 +142,16 @@ function main() {
   if (foundCount === 0) {
     console.log('\nℹ️  No VS Code installations detected');
     console.log('   Add this to your VS Code User/mcp.json manually:');
-    console.log(JSON.stringify(MCP_CONFIG, null, 2));
+    console.log(MCP_CONFIG_WITH_COMMENTS);
   } else if (configuredCount > 0) {
     console.log('\n🎉 Configuration complete!');
     console.log('   Restart VS Code and simple-memory-mcp will be available');
+    console.log('\n💡 Customization Tips:');
+    console.log('   • Set custom database location with MEMORY_DB environment variable');
+    console.log('   • Enable automatic backups with MEMORY_BACKUP_PATH');
+    console.log('   • Run multiple instances for work/personal contexts');
+    console.log('   • See README for all configuration options');
+    console.log('\n📖 Configuration docs: https://github.com/chrisribe/simple-memory-mcp#configuration');
   } else {
     console.log('\n✅ All installations already configured');
   }

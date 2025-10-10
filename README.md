@@ -60,6 +60,8 @@ That's it! The `setup` command automatically:
 - ✅ Configures VS Code (both stable and Insiders)
 
 > 💡 VS Code users: The setup automatically adds the MCP server to your `mcp.json` file. Just restart VS Code after setup!
+> 
+> 💡 Need to customize? Run `npm run setup` again to see the config file path (Ctrl+click to open)
 
 ### 2️⃣ For Other MCP Clients (Optional)
 
@@ -283,6 +285,8 @@ Get statistics about stored memories.
 | `DEBUG` | Enable debug logging | `false` | `true` |
 
 ### Custom Database Location
+
+> 💡 **Quick Access**: Run `npm run setup` to see your config file path, then Ctrl+click to open it
 
 ```json
 {
