@@ -156,6 +156,78 @@ export const migrations: Migration[] = [
       
       debugLog('Migration 4: FTS update trigger fixed');
     }
+  },
+  {
+    version: 5,
+    description: 'Drop deprecated tags column from memories table',
+    up: (db: Database.Database) => {
+      debugLog('Migration 5: Dropping deprecated tags column');
+      
+      // SQLite doesn't support DROP COLUMN directly, so we need to:
+      // 1. Create a new table without the tags column
+      // 2. Copy data from old table to new table
+      // 3. Drop old table
+      // 4. Rename new table to old name
+      
+      // Create new memories table without tags column
+      db.exec(`
+        CREATE TABLE memories_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          content TEXT NOT NULL,
+          created_at TEXT,
+          hash TEXT UNIQUE
+        )
+      `);
+      
+      // Copy all data from old table to new table
+      db.exec(`
+        INSERT INTO memories_new (id, content, created_at, hash)
+        SELECT id, content, created_at, hash FROM memories
+      `);
+      
+      // Drop triggers that reference the old table
+      db.exec(`DROP TRIGGER IF EXISTS memories_ai`);
+      db.exec(`DROP TRIGGER IF EXISTS memories_au`);
+      db.exec(`DROP TRIGGER IF EXISTS memories_ad`);
+      
+      // Drop old table
+      db.exec(`DROP TABLE memories`);
+      
+      // Rename new table to original name
+      db.exec(`ALTER TABLE memories_new RENAME TO memories`);
+      
+      // Recreate triggers for the new table
+      db.exec(`
+        CREATE TRIGGER memories_ai AFTER INSERT ON memories BEGIN
+          INSERT INTO memories_fts (rowid, content) 
+          VALUES (new.id, new.content);
+        END;
+      `);
+      
+      db.exec(`
+        CREATE TRIGGER memories_au AFTER UPDATE ON memories BEGIN
+          DELETE FROM memories_fts WHERE rowid = old.id;
+          INSERT INTO memories_fts (rowid, content) VALUES (new.id, new.content);
+        END;
+      `);
+      
+      db.exec(`
+        CREATE TRIGGER memories_ad AFTER DELETE ON memories BEGIN
+          DELETE FROM memories_fts WHERE rowid = old.id;
+        END;
+      `);
+      
+      // Recreate indexes
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_memories_created_at ON memories(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_memories_hash ON memories(hash);
+      `);
+      
+      // Run ANALYZE to update query planner statistics
+      db.exec('ANALYZE');
+      
+      debugLog('Migration 5: Deprecated tags column dropped successfully');
+    }
   }
   // Future migrations go here - just add to the array!
 ];

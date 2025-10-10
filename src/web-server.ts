@@ -94,59 +94,55 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
           return;
         }
 
-        let html = readFileSync(htmlPath, 'utf-8');
-        
-        // Inject API configuration
-        const configScript = `
-        const DB_PATH = '${dbPath.replace(/\\/g, '/')}';
-        const API_URL = 'http://localhost:${PORT}/api';`;
-        
-        html = html.replace(
-          /const DB_PATH = ['"][^'"]*['"];/,
-          configScript
-        );
-        
-        // Replace loadMemories function to use API
-        html = html.replace(
-          /async function loadMemories\(\) \{[\s\S]*?^\s{8}\}/m,
-          `async function loadMemories() {
-            try {
-                document.getElementById('loading').style.display = 'block';
-                
-                // Fetch stats
-                const statsRes = await fetch(API_URL + '/stats');
-                if (!statsRes.ok) throw new Error('Failed to fetch stats');
-                dbStats = await statsRes.json();
-                
-                // Fetch all memories
-                const memoriesRes = await fetch(API_URL + '/memories?limit=1000');
-                if (!memoriesRes.ok) throw new Error('Failed to fetch memories');
-                const data = await memoriesRes.json();
-                
-                allMemories = data.memories || [];
-                displayedMemories = allMemories;
-                
-                extractTags();
-                renderMemories();
-                renderTagCloud();
-                updateStats();
-                
-                // Clear any previous errors
-                document.getElementById('error').style.display = 'none';
-                
-            } catch (error) {
-                showError(\`Error loading memories: \${error.message}\`);
-            } finally {
-                document.getElementById('loading').style.display = 'none';
-            }
-        }`
-        );
+        const html = readFileSync(htmlPath, 'utf-8');
         
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(html);
         return;
       } catch (error: any) {
         sendError(res, `Failed to load HTML: ${error.message}`, 500);
+        return;
+      }
+    }
+
+    // Serve CSS file
+    if (req.url === '/styles.css') {
+      try {
+        const cssPath = join(__dirname, '..', 'web', 'styles.css');
+        
+        if (!existsSync(cssPath)) {
+          sendError(res, 'CSS file not found', 404);
+          return;
+        }
+
+        const css = readFileSync(cssPath, 'utf-8');
+        
+        res.writeHead(200, { 'Content-Type': 'text/css; charset=utf-8' });
+        res.end(css);
+        return;
+      } catch (error: any) {
+        sendError(res, `Failed to load CSS: ${error.message}`, 500);
+        return;
+      }
+    }
+
+    // Serve JavaScript file
+    if (req.url === '/app.js') {
+      try {
+        const jsPath = join(__dirname, '..', 'web', 'app.js');
+        
+        if (!existsSync(jsPath)) {
+          sendError(res, 'JavaScript file not found', 404);
+          return;
+        }
+
+        const js = readFileSync(jsPath, 'utf-8');
+        
+        res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
+        res.end(js);
+        return;
+      } catch (error: any) {
+        sendError(res, `Failed to load JavaScript: ${error.message}`, 500);
         return;
       }
     }
@@ -185,7 +181,20 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
       if (pathWithoutQuery === '/stats') {
         try {
           const stats = memoryService.stats();
-          sendJSON(res, stats);
+          
+          // Format database size for display
+          const formatBytes = (bytes: number): string => {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+          };
+          
+          sendJSON(res, {
+            ...stats,
+            dbSize: formatBytes(stats.dbSize)
+          });
         } catch (error: any) {
           sendError(res, `Stats failed: ${error.message}`, 500);
         }
