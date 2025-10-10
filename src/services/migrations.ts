@@ -135,6 +135,27 @@ export const migrations: Migration[] = [
       
       debugLog('Migration 3: FTS table updated successfully');
     }
+  },
+  {
+    version: 4,
+    description: 'Fix FTS update trigger for external content tables',
+    up: (db: Database.Database) => {
+      debugLog('Migration 4: Fixing FTS update trigger');
+      
+      // Drop old update trigger
+      db.exec(`DROP TRIGGER IF EXISTS memories_au`);
+      
+      // Recreate with correct DELETE+INSERT pattern for external content FTS5
+      // External content FTS5 tables don't support UPDATE, must DELETE+INSERT
+      db.exec(`
+        CREATE TRIGGER memories_au AFTER UPDATE ON memories BEGIN
+          DELETE FROM memories_fts WHERE rowid = old.id;
+          INSERT INTO memories_fts (rowid, content) VALUES (new.id, new.content);
+        END;
+      `);
+      
+      debugLog('Migration 4: FTS update trigger fixed');
+    }
   }
   // Future migrations go here - just add to the array!
 ];

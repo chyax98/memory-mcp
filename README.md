@@ -147,6 +147,9 @@ simple-memory search-memory --start-date "2025-01-01" --end-date "2025-01-31"
 # View statistics
 simple-memory memory-stats
 
+# Update a memory
+simple-memory update-memory --hash "abc123..." --content "Updated content" --tags "new,tags"
+
 # Delete by tag
 simple-memory delete-memory --tag "old-notes"
 ```
@@ -212,6 +215,28 @@ Search stored memories by content or tags, with optional time range filtering.
 
 // Find recent memories with specific tags
 { "tags": ["bug"], "daysAgo": 3 }
+```
+
+### `update-memory`
+Update an existing memory with new content and/or tags.
+
+**Parameters:**
+- `hash` (string, required) - Hash of the memory to update
+- `content` (string, required) - New content for the memory
+- `tags` (array, optional) - New tags to replace existing tags (if omitted, existing tags preserved)
+
+**Behavior:**
+- Hash changes when content changes
+- Memory ID and creation date remain unchanged
+- Relationships to other memories are preserved
+
+**Example:**
+```json
+{
+  "hash": "abc123...",
+  "content": "Updated project status: phase 2 complete",
+  "tags": ["project", "status", "complete"]
+}
 ```
 
 ### `delete-memory`
