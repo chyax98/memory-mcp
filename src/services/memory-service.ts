@@ -169,10 +169,11 @@ export class MemoryService {
     `);
 
     // Create trigger to automatically update FTS when memories are updated
+    // Note: External content FTS5 tables don't support UPDATE, must DELETE+INSERT
     this.db.exec(`
       CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON memories BEGIN
-        UPDATE memories_fts SET content = new.content 
-        WHERE rowid = new.id;
+        DELETE FROM memories_fts WHERE rowid = old.id;
+        INSERT INTO memories_fts (rowid, content) VALUES (new.id, new.content);
       END;
     `);
 
@@ -217,6 +218,11 @@ export class MemoryService {
       deleteByHash: this.db!.prepare(`
         DELETE FROM memories WHERE hash = ?
       `),
+      updateMemory: this.db!.prepare(`
+        UPDATE memories 
+        SET content = ?, hash = ?
+        WHERE id = ?
+      `),
       
       // Tag operations (NEW)
       insertTag: this.db!.prepare(`
@@ -224,6 +230,9 @@ export class MemoryService {
       `),
       getTagsForMemory: this.db!.prepare(`
         SELECT tag FROM tags WHERE memory_id = ? ORDER BY tag
+      `),
+      deleteTagsForMemory: this.db!.prepare(`
+        DELETE FROM tags WHERE memory_id = ?
       `),
       searchByTag: this.db!.prepare(`
         SELECT DISTINCT m.*
@@ -642,6 +651,72 @@ export class MemoryService {
   }
 
   /**
+   * Update an existing memory by hash
+   * @param hash The hash of the memory to update
+   * @param newContent The new content for the memory
+   * @param newTags Optional new tags (if provided, replaces all existing tags)
+   * @returns The new hash if successful, null if memory not found
+   */
+  update(hash: string, newContent: string, newTags?: string[]): string | null {
+    // Validate content size
+    if (newContent.length > this.maxContentSize) {
+      throw new Error(`Content exceeds maximum size of ${this.maxContentSize} characters`);
+    }
+
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    // Find the existing memory
+    const existing = this.stmts.getMemoryByHash.get(hash) as any;
+    if (!existing) {
+      debugLogHash('MemoryService: Memory not found for update:', hash);
+      return null;
+    }
+
+    // Calculate new hash
+    const newHash = createHash('md5').update(newContent).digest('hex');
+
+    try {
+      // Use transaction for atomicity
+      const updateMemory = this.db.transaction(() => {
+        // Update memory content (FTS will be updated automatically by trigger)
+        this.stmts.updateMemory.run(newContent, newHash, existing.id);
+
+        // Update tags if provided
+        if (newTags !== undefined) {
+          // Delete old tags
+          this.stmts.deleteTagsForMemory.run(existing.id);
+
+          // Insert new tags
+          for (const tag of newTags) {
+            const normalizedTag = tag.trim().toLowerCase();
+            if (normalizedTag) {
+              this.stmts.insertTag.run(existing.id, normalizedTag);
+            }
+          }
+        }
+
+        return newHash;
+      });
+
+      const resultHash = updateMemory();
+      debugLogHash('MemoryService: Updated memory from hash:', hash, 'to new hash:', resultHash);
+
+      // Backup if needed (lazy, throttled)
+      this.backup?.backupIfNeeded();
+
+      return resultHash;
+    } catch (error: any) {
+      if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        throw new Error(`Cannot update: a memory with the new content already exists (hash: ${newHash})`);
+      }
+      debugLog('MemoryService: Error updating memory:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get memory by hash
    */
   getByHash(hash: string): MemoryEntry | null {
@@ -650,10 +725,13 @@ export class MemoryService {
       return null;
     }
 
+    // Hydrate with tags from tags table
+    const tagRows = this.stmts.getTagsForMemory.all(result.id) as Array<{ tag: string }>;
+
     return {
       id: result.id,
       content: result.content,
-      tags: result.tags ? result.tags.split(',') : [],
+      tags: tagRows.map(t => t.tag),
       createdAt: result.created_at,
       hash: result.hash
     };

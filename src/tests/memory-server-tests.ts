@@ -376,6 +376,116 @@ async function testSearchWithRelationships(): Promise<void> {
 }
 
 /**
+ * Test updating memory content
+ */
+async function testUpdateMemoryContent(): Promise<void> {
+  // Store a memory first
+  const storeResult = await executeCommand(['store-memory', '--content', 'Initial project status: planning phase', '--tags', 'project,status']);
+  const storeOutput = parseJsonOutput(storeResult.stdout);
+  
+  if (!storeOutput?.success || !storeOutput?.hash) {
+    throw new Error('Failed to store initial memory for update test');
+  }
+
+  const originalHash = storeOutput.hash;
+  console.log(`✓ Stored initial memory with hash: ${formatHash(originalHash)}`);
+
+  // Update the memory content
+  const updateResult = await executeCommand(['update-memory', '--hash', originalHash, '--content', 'Updated project status: in development phase']);
+  
+  if (updateResult.exitCode !== 0) {
+    throw new Error(`Update memory failed: ${updateResult.stderr}`);
+  }
+
+  const updateOutput = parseJsonOutput(updateResult.stdout);
+  if (!updateOutput?.success || !updateOutput?.newHash) {
+    throw new Error('Update did not return success with new hash');
+  }
+
+  console.log(`✓ Updated memory, new hash: ${formatHash(updateOutput.newHash)}`);
+
+  // Verify the update by searching for new content
+  const searchResult = await executeCommand(['search-memory', '--query', 'development phase']);
+  const searchOutput = parseJsonOutput(searchResult.stdout);
+  
+  if (!searchOutput?.memories || searchOutput.memories.length === 0) {
+    throw new Error('Could not find updated memory with new content');
+  }
+
+  const foundMemory = searchOutput.memories.find((m: any) => m.hash === updateOutput.newHash);
+  if (!foundMemory) {
+    throw new Error('Updated memory not found in search results');
+  }
+
+  console.log(`✓ Verified updated memory can be searched`);
+}
+
+/**
+ * Test updating memory tags
+ */
+async function testUpdateMemoryTags(): Promise<void> {
+  // Store a memory
+  const storeResult = await executeCommand(['store-memory', '--content', 'TypeScript configuration notes', '--tags', 'typescript,draft']);
+  const storeOutput = parseJsonOutput(storeResult.stdout);
+  
+  if (!storeOutput?.success || !storeOutput?.hash) {
+    throw new Error('Failed to store initial memory for tag update test');
+  }
+
+  const hash = storeOutput.hash;
+
+  // Update tags only (keep same content)
+  const updateResult = await executeCommand(['update-memory', '--hash', hash, '--content', 'TypeScript configuration notes', '--tags', 'typescript,config,complete']);
+  
+  if (updateResult.exitCode !== 0) {
+    throw new Error(`Tag update failed: ${updateResult.stderr}`);
+  }
+
+  const updateOutput = parseJsonOutput(updateResult.stdout);
+  if (!updateOutput?.success || !updateOutput?.tagsUpdated) {
+    throw new Error('Tag update did not indicate tags were updated');
+  }
+
+  console.log(`✓ Updated tags successfully`);
+
+  // Verify new tags by searching
+  const searchResult = await executeCommand(['search-memory', '--tags', 'config']);
+  const searchOutput = parseJsonOutput(searchResult.stdout);
+  
+  if (!searchOutput?.memories) {
+    throw new Error('Tag search failed after update');
+  }
+
+  const foundMemory = searchOutput.memories.find((m: any) => m.hash === updateOutput.newHash);
+  if (!foundMemory) {
+    throw new Error('Memory with updated tags not found');
+  }
+
+  if (!foundMemory.tags.includes('config') || foundMemory.tags.includes('draft')) {
+    throw new Error('Tags were not properly updated');
+  }
+
+  console.log(`✓ Verified tags were updated correctly`);
+}
+
+/**
+ * Test update with non-existent hash
+ */
+async function testUpdateNonExistentMemory(): Promise<void> {
+  const fakeHash = 'nonexistenthash123456789';
+  const updateResult = await executeCommand(['update-memory', '--hash', fakeHash, '--content', 'This should fail']);
+  
+  const updateOutput = parseJsonOutput(updateResult.stdout);
+  
+  // Should return success: false when memory not found
+  if (updateOutput?.success !== false) {
+    throw new Error('Update should fail gracefully for non-existent memory');
+  }
+
+  console.log(`✓ Update correctly handled non-existent memory`);
+}
+
+/**
  * Main test runner
  */
 async function runAllTests(): Promise<void> {
@@ -393,6 +503,9 @@ async function runAllTests(): Promise<void> {
     { name: 'Memory Statistics', fn: testMemoryStats },
     { name: 'Integrated Relationships', fn: testIntegratedRelationships },
     { name: 'Search with Relationships', fn: testSearchWithRelationships },
+    { name: 'Update Memory Content', fn: testUpdateMemoryContent },
+    { name: 'Update Memory Tags', fn: testUpdateMemoryTags },
+    { name: 'Update Non-Existent Memory', fn: testUpdateNonExistentMemory },
     { name: 'Delete Memory by Tag', fn: testDeleteMemoryByTag },
     { name: 'Search with Limit', fn: testSearchWithLimit },
     { name: 'Improved Search (OR + BM25)', fn: testImprovedSearch }
