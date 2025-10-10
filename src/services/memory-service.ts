@@ -466,7 +466,28 @@ export class MemoryService {
    */
   delete(hash: string): boolean {
     const result = this.stmts.deleteByHash.run(hash);
-    const deleted = result.changes > 0;
+    let deleted = result.changes > 0;
+    
+    // Fallback: If hash lookup failed, force full table scan (bypasses corrupted index)
+    // The + prefix tells SQLite to not use the index on hash column
+    if (!deleted && this.db) {
+      debugLogHash('MemoryService: Hash lookup failed, trying fallback full table scan for:', hash);
+      const orphaned = this.db.prepare('SELECT id FROM memories WHERE +hash = ?').get(hash) as any;
+      
+      if (orphaned) {
+        // DIAGNOSTIC: This indicates hash index corruption - log details for investigation
+        console.error('⚠️  HASH INDEX CORRUPTION DETECTED ⚠️');
+        console.error('Hash:', hash);
+        console.error('Memory ID:', orphaned.id);
+        console.error('This suggests index corruption occurred during a previous operation.');
+        console.error('Please report this with the hash and operation that preceded it.');
+        
+        debugLog('MemoryService: Found orphaned memory with corrupted hash index, deleting by ID:', orphaned.id);
+        const fallbackResult = this.db.prepare('DELETE FROM memories WHERE id = ?').run(orphaned.id);
+        deleted = fallbackResult.changes > 0;
+      }
+    }
+    
     debugLogHash('MemoryService: Delete by hash', hash, deleted ? 'success' : 'not found');
     
     // Backup if needed (lazy, throttled)
@@ -668,7 +689,27 @@ export class MemoryService {
     }
 
     // Find the existing memory
-    const existing = this.stmts.getMemoryByHash.get(hash) as any;
+    let existing = this.stmts.getMemoryByHash.get(hash) as any;
+    
+    // Fallback: If hash lookup failed, force full table scan (bypasses corrupted index)
+    // The + prefix tells SQLite to not use the index on hash column
+    if (!existing) {
+      debugLogHash('MemoryService: Hash lookup failed, trying fallback full table scan for:', hash);
+      existing = this.db.prepare('SELECT * FROM memories WHERE +hash = ?').get(hash) as any;
+      
+      if (existing) {
+        // DIAGNOSTIC: This indicates hash index corruption - log details for investigation
+        console.error('⚠️  HASH INDEX CORRUPTION DETECTED ⚠️');
+        console.error('Hash:', hash);
+        console.error('Memory ID:', existing.id);
+        console.error('Operation: UPDATE');
+        console.error('This suggests index corruption occurred during a previous operation.');
+        console.error('Please report this with the hash and operation that preceded it.');
+        
+        debugLog('MemoryService: Found orphaned memory with corrupted hash index, ID:', existing.id);
+      }
+    }
+    
     if (!existing) {
       debugLogHash('MemoryService: Memory not found for update:', hash);
       return null;
