@@ -1,6 +1,6 @@
 {
   "name": "simple-memory-mcp",
-  "version": "1.0.10",
+  "version": "1.0.13",
   "description": "Simple memory MCP server for storing and retrieving memories with tags",
   "main": "dist/index.js",
   "type": "module",
@@ -13,8 +13,10 @@
     "LICENSE"
   ],
   "scripts": {
-    "prebuild": "node scripts/bump-version.js patch",
+    "setup": "npm install && npm run build && npm link && npm run configure",
+    "configure": "node scripts/setup-vscode.js",
     "build": "tsc",
+    "build:release": "node scripts/bump-version.js patch && tsc",
     "postbuild": "node -e \"if (process.platform !== 'win32') { require('child_process').execSync('chmod +x dist/index.js'); }\"",
     "version:patch": "node scripts/bump-version.js patch",
     "version:minor": "node scripts/bump-version.js minor",

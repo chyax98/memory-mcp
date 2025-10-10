@@ -39,52 +39,55 @@ Perfect for AI assistants that need to remember context across conversations, st
 
 ## 🚀 Quick Start
 
-### 1️⃣ Install
+### 1️⃣ One-Command Setup
 
-**Option A: From npm (when published)**
+**From Source:**
+```bash
+git clone https://github.com/chrisribe/simple-memory-mcp.git
+cd simple-memory-mcp
+npm run setup
+```
+
+**Or from npm (when published):**
 ```bash
 npm install -g simple-memory-mcp
 ```
 
-**Option B: For development/testing (current)**
-```bash
-# Clone and build the repository
-git clone https://github.com/chrisribe/simple-memory-mcp.git
-cd simple-memory-mcp
-npm install
+That's it! The `setup` command automatically:
+- ✅ Installs dependencies
+- ✅ Builds TypeScript → JavaScript
+- ✅ Links globally (makes `simple-memory` command available)
+- ✅ Configures VS Code (both stable and Insiders)
 
-# Link globally (builds automatically)
-npm run link
+> 💡 VS Code users: The setup automatically adds the MCP server to your `mcp.json` file. Just restart VS Code after setup!
 
-# Now 'simple-memory' command works globally!
-simple-memory memory-stats
+### 2️⃣ For Other MCP Clients (Optional)
 
-# To unlink later
-npm run unlink
-```
+If you're using Claude Desktop or other MCP clients, add this to their config:
 
-> 💡 **What's the difference?** Option A installs from npm's registry (not available yet). Option B creates a symlink to your local code, perfect for testing and development. Both make the `simple-memory` command available globally.
-
-### 2️⃣ Configure Your MCP Client
-
-Add to your MCP client config (e.g., Claude Desktop's `claude_desktop_config.json`):
-
+**Claude Desktop** (`claude_desktop_config.json`):
 ```json
 {
   "mcpServers": {
-    "simple-memory": {
+    "simple-memory-mcp": {
       "command": "simple-memory"
     }
   }
 }
 ```
 
-> 💡 **Windows users**: Config is usually at `%APPDATA%\Claude\claude_desktop_config.json`  
-> 💡 **macOS users**: Config is usually at `~/Library/Application Support/Claude/claude_desktop_config.json`
+> 💡 **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`  
+> 💡 **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 
-### 3️⃣ Restart Your MCP Client
+### 3️⃣ Start Using
 
-That's it! Start storing and retrieving memories with your AI assistant.
+Restart your MCP client and the `simple-memory-mcp` server will be available. The AI assistant can now:
+- 🧠 Remember information across conversations
+- 🔍 Search your stored memories
+- 🏷️ Organize with tags
+- 🔗 Link related memories automatically
+
+**All transparent - no UI, no manual steps. Just works!**
 
 ---
 

@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Automated VS Code Setup**: One-command installation with automatic configuration
+  - `npm run setup` command that handles install, build, link, and VS Code config
+  - Automatic detection of VS Code stable and Insiders
+  - Smart detection of `mcp.json` format (supports both `servers` and `mcpServers` properties)
+  - Cross-platform support (Windows, macOS, Linux)
+  - No manual configuration needed for VS Code users
+
+- **Improved Build System**: Separated dev and release builds
+  - `npm run build` - Fast development build (no version bump)
+  - `npm run build:release` - Release build with automatic version bump
+  - Prevents version spam during development
+  - Cleaner version history
+
 - **Time Range Search**: Filter memories by creation date
   - `daysAgo` parameter - Search memories from last N days (e.g., 7 for last week)
   - `startDate` parameter - Search memories created on or after a specific date
@@ -29,93 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Backup configuration examples
   - Real-world usage examples
 
-## [2.0.0] - 2025-01-XX
-
-### Added
-- **Migration System**: Automatic schema evolution with backup safety
-  - Version tracking table for migration history
-  - Automatic backups before any schema changes
-  - Transaction-based migration execution
-  - Idempotent migrations (safe to re-run)
-  
-- **Normalized Tag Storage**: Separate tags table with proper indexing
-  - 50-200x faster tag searches via indexed queries
-  - Tag normalization (lowercase, trimmed)
-  - Automatic migration from old comma-separated format
-  
-- **Performance Indexes**: Comprehensive indexing strategy
-  - `idx_tags_tag` - Fast tag lookups
-  - `idx_tags_memory_id` - Fast memory→tags joins
-  - `idx_memories_created_at` - Fast recent memory queries
-  - `idx_memories_hash` - Fast hash lookups
-  - `idx_relationships_from/to/composite` - Fast relationship queries
-  
-- **Bulk Operations**: Transaction-based bulk relationship creation
-  - `linkMemoriesBulk()` method for 10-50x faster linking
-  - Automatic relationship detection using bulk operations
-  - Improved relationship creation by building relationships array first then using bulk insert instead of sequential individual database calls
-  - Provides 10-50x performance improvement through transaction-based batch operations
-  
-- **Debug Utilities**: Centralized hash formatting and debug logging
-  - `formatHash()` - Consistent 8-character hash display
-  - `debugLogHash()` - Conditional debug output
-  - `debugLogHashes()` - Multi-hash debug output
-  - `isDebugEnabled()` - Check debug state
-  
-- **Comprehensive Testing**:
-  - Migration tests (13 scenarios) for schema upgrade validation
-  - Performance benchmarks (14 operations) with target validation
-  - All tests passing (28/28) with 100% backward compatibility
-
-- **Database Optimizations**:
-  - WAL mode for better concurrency (2-3x improvement)
-  - 64MB cache size for fewer disk reads (50-90% reduction in I/O)
-  - Memory temp storage for faster complex queries (10-100x)
-  - NORMAL synchronous mode for balanced safety/speed
-  - FTS5 optimization after bulk inserts
-
-### Changed
-- **FTS Table Schema**: Removed tags column (tags now in separate table)
-  - Migration 3 handles automatic FTS table recreation
-  - Triggers updated to match new schema
-  - Automatic repopulation of FTS data
-  
-- **Memory Service Methods**: Removed unnecessary async/await overhead
-  - `initialize()` now synchronous (5-10% faster)
-  - `stats()` now synchronous with cached path resolution
-  - `close()` now synchronous
-  
-- **Tag Queries**: Now use indexed table instead of LIKE on comma-separated strings
-  - `search()` updated for fast indexed tag queries
-  - `deleteByTag()` updated to use indexes
-  - Tag hydration from normalized table
-
-### Performance
-- **Tag Search**: 0.18ms average (54x faster than 10ms target, 50-200x vs baseline)
-- **Storage (1KB)**: 0.10ms average (49x faster than 5ms target)
-- **FTS Search**: 0.14ms average (714x faster than 100ms target)
-- **Bulk Operations**: 0.26ms for 10 relationships (193x faster than 50ms target)
-- **Overall Throughput**: 2,000-10,000 operations/second
-- **Database Size**: Efficient storage with ~372KB for 148 memories
-
-### Fixed
-- Eliminated 17 duplicate hash substring operations
-- Fixed repeated path resolution in stats() calls
-- Improved error handling in migration system
-
-### Migration Notes
-- **Automatic Migration**: Old databases automatically upgrade on first use
-- **Zero Downtime**: Migrations complete in <50ms for typical databases
-- **Data Safety**: Automatic backup created before any schema changes
-- **Backward Compatible**: No breaking API changes, 100% compatible with v1.x
-- **Rollback Available**: Backups enable recovery if issues occur
-
-### Breaking Changes
-**None** - Full backward compatibility maintained. All v1.x APIs work unchanged.
-
 ---
 
-## [1.0.0] - 2024-XX-XX
+## [1.0.0] - 2025-08-22
 
 ### Added
 - Initial release
