@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory Browser - Simple Memory MCP</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧠 Memory Browser</h1>
+            <div class="subtitle">Explore your simple-memory-mcp database</div>
+        </header>
+
+        <div class="controls">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Search memories by content...">
+                <button id="searchBtn">Search</button>
+                <button id="clearBtn">Clear</button>
+            </div>
+            
+            <div id="tagCloud" class="tag-cloud"></div>
+            
+            <div class="stats">
+                <div class="stat">
+                    <span>Total:</span>
+                    <strong id="totalCount">0</strong>
+                </div>
+                <div class="stat">
+                    <span>Displayed:</span>
+                    <strong id="displayedCount">0</strong>
+                </div>
+                <div class="stat">
+                    <span>Database:</span>
+                    <strong id="dbPath">Loading...</strong>
+                </div>
+            </div>
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+        <div id="loading" class="loading">Loading memories...</div>
+        <div id="memoriesGrid" class="memories-grid"></div>
+    </div>
+
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Memory Details</h2>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div id="modalMeta" class="memory-meta"></div>
+            <div id="modalTags" class="memory-tags"></div>
+            <div id="modalBody" class="modal-body"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -113,7 +113,6 @@ export class MemoryService {
       CREATE TABLE IF NOT EXISTS memories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         content TEXT NOT NULL,
-        tags TEXT,
         created_at TEXT,
         hash TEXT UNIQUE
       )
@@ -201,8 +200,8 @@ export class MemoryService {
     this.stmts = {
       // Memory operations
       insert: this.db!.prepare(`
-        INSERT INTO memories (content, tags, created_at, hash) 
-        VALUES (?, ?, ?, ?)
+        INSERT INTO memories (content, created_at, hash) 
+        VALUES (?, ?, ?)
       `),
       getMemoryById: this.db!.prepare(`
         SELECT * FROM memories WHERE id = ?
@@ -257,10 +256,10 @@ export class MemoryService {
         LIMIT ?
       `),
       
-      // Legacy tag search (fallback for old databases before migration)
+      // Legacy tag search (no longer used after migration 2)
       searchTagsLegacy: this.db!.prepare(`
         SELECT * FROM memories 
-        WHERE tags LIKE ?
+        WHERE 1=0
         ORDER BY created_at DESC
         LIMIT ?
       `),
@@ -308,10 +307,8 @@ export class MemoryService {
       
       // Use transaction for atomicity and performance
       const insertMemory = this.db.transaction(() => {
-        // Insert memory with tags=null (legacy column deprecated in v2.0)
-        // Tags are now stored in normalized 'tags' table for performance
-        // The 'tags' column is kept NULL for backward compatibility with schema
-        const result = this.stmts.insert.run(content, /* tags */ null, createdAt, hash);
+        // Insert memory (tags stored in normalized 'tags' table since v2.0)
+        const result = this.stmts.insert.run(content, createdAt, hash);
         const memoryId = result.lastInsertRowid as number;
         
         // Insert tags into normalized tags table
@@ -466,7 +463,28 @@ export class MemoryService {
    */
   delete(hash: string): boolean {
     const result = this.stmts.deleteByHash.run(hash);
-    const deleted = result.changes > 0;
+    let deleted = result.changes > 0;
+    
+    // Fallback: If hash lookup failed, force full table scan (bypasses corrupted index)
+    // The + prefix tells SQLite to not use the index on hash column
+    if (!deleted && this.db) {
+      debugLogHash('MemoryService: Hash lookup failed, trying fallback full table scan for:', hash);
+      const orphaned = this.db.prepare('SELECT id FROM memories WHERE +hash = ?').get(hash) as any;
+      
+      if (orphaned) {
+        // DIAGNOSTIC: This indicates hash index corruption - log details for investigation
+        console.error('⚠️  HASH INDEX CORRUPTION DETECTED ⚠️');
+        console.error('Hash:', hash);
+        console.error('Memory ID:', orphaned.id);
+        console.error('This suggests index corruption occurred during a previous operation.');
+        console.error('Please report this with the hash and operation that preceded it.');
+        
+        debugLog('MemoryService: Found orphaned memory with corrupted hash index, deleting by ID:', orphaned.id);
+        const fallbackResult = this.db.prepare('DELETE FROM memories WHERE id = ?').run(orphaned.id);
+        deleted = fallbackResult.changes > 0;
+      }
+    }
+    
     debugLogHash('MemoryService: Delete by hash', hash, deleted ? 'success' : 'not found');
     
     // Backup if needed (lazy, throttled)
@@ -585,14 +603,18 @@ export class MemoryService {
 
     const results = this.stmts.getRelated.all(memory.id, memory.id, memory.id, limit) as any[];
     
-    const related = results.map((row: any) => ({
-      id: row.id,
-      content: row.content,
-      tags: row.tags ? row.tags.split(',') : [],
-      createdAt: row.created_at,
-      hash: row.hash,
-      relationshipType: row.relationship_type
-    }));
+    const related = results.map((row: any) => {
+      // Hydrate tags from tags table
+      const tagRows = this.stmts.getTagsForMemory.all(row.id) as Array<{ tag: string }>;
+      return {
+        id: row.id,
+        content: row.content,
+        tags: tagRows.map(t => t.tag),
+        createdAt: row.created_at,
+        hash: row.hash,
+        relationshipType: row.relationship_type
+      };
+    });
 
     debugLog('MemoryService: Found', related.length, 'related memories');
     return related;
@@ -668,7 +690,27 @@ export class MemoryService {
     }
 
     // Find the existing memory
-    const existing = this.stmts.getMemoryByHash.get(hash) as any;
+    let existing = this.stmts.getMemoryByHash.get(hash) as any;
+    
+    // Fallback: If hash lookup failed, force full table scan (bypasses corrupted index)
+    // The + prefix tells SQLite to not use the index on hash column
+    if (!existing) {
+      debugLogHash('MemoryService: Hash lookup failed, trying fallback full table scan for:', hash);
+      existing = this.db.prepare('SELECT * FROM memories WHERE +hash = ?').get(hash) as any;
+      
+      if (existing) {
+        // DIAGNOSTIC: This indicates hash index corruption - log details for investigation
+        console.error('⚠️  HASH INDEX CORRUPTION DETECTED ⚠️');
+        console.error('Hash:', hash);
+        console.error('Memory ID:', existing.id);
+        console.error('Operation: UPDATE');
+        console.error('This suggests index corruption occurred during a previous operation.');
+        console.error('Please report this with the hash and operation that preceded it.');
+        
+        debugLog('MemoryService: Found orphaned memory with corrupted hash index, ID:', existing.id);
+      }
+    }
+    
     if (!existing) {
       debugLogHash('MemoryService: Memory not found for update:', hash);
       return null;
@@ -982,19 +1024,20 @@ export class MemoryService {
     if (!this.db) return null;
 
     const stmt = this.db.prepare(`
-      SELECT id, content, tags, created_at, hash
-      FROM memories
-      WHERE hash = ?
+      SELECT * FROM memories WHERE hash = ?
     `);
 
     const result = stmt.get(hash) as any;
     
     if (!result) return null;
 
+    // Hydrate with tags from tags table
+    const tagRows = this.stmts.getTagsForMemory.all(result.id) as Array<{ tag: string }>;
+
     return {
       id: result.id,
       content: result.content,
-      tags: result.tags ? result.tags.split(',') : [],
+      tags: tagRows.map(t => t.tag),
       createdAt: result.created_at,
       hash: result.hash
     };

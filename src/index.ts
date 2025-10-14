@@ -16,6 +16,7 @@ import { MemoryService } from './services/memory-service.js';
 import { toolRegistry } from './tools/index.js';
 import type { ToolContext } from './types/tools.js';
 import { debugLog } from './utils/debug.js';
+import { checkDatabaseIntegrity, rebuildHashIndex } from './utils/db-integrity-check.js';
 
 // Initialize server
 const server = new Server(
@@ -126,7 +127,37 @@ async function main() {
   };
   
   if (args.length > 0) {
-    // CLI mode
+    // CLI mode - check for integrity commands first
+    if (args[0] === 'check-integrity') {
+      const dbPath = process.env.MEMORY_DB || './memory.db';
+      console.log('Running database integrity check...\n');
+      const result = checkDatabaseIntegrity(dbPath);
+      
+      console.log('=== Integrity Check Results ===');
+      console.log(`Total memories: ${result.totalMemories}`);
+      console.log(`Corrupted hashes: ${result.corruptedHashes}`);
+      console.log(`Orphaned hash indexes: ${result.orphanedHashIndexes}`);
+      console.log(`Missing hash indexes: ${result.missingHashIndexes}`);
+      
+      if (result.orphanedMemories.length > 0) {
+        console.log('\n⚠️  Issues found:');
+        result.orphanedMemories.forEach(mem => {
+          console.log(`  ID ${mem.id}: ${mem.hash}`);
+          console.log(`    Content: ${mem.content}`);
+        });
+        console.log('\nRun "node dist/index.js rebuild-index" to rebuild the hash index');
+      } else {
+        console.log('\n✓ No integrity issues detected');
+      }
+      
+      process.exit(result.orphanedMemories.length > 0 ? 1 : 0);
+    } else if (args[0] === 'rebuild-index') {
+      const dbPath = process.env.MEMORY_DB || './memory.db';
+      rebuildHashIndex(dbPath);
+      process.exit(0);
+    }
+    
+    // CLI mode - handle tool execution
     const [toolName, ...toolArgs] = args;
     
     if (!toolRegistry.hasTool(toolName)) {
