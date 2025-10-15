@@ -140,6 +140,9 @@ simple-memory search-memory --query "search term"
 # Search by tags
 simple-memory search-memory --tags "tag1,tag2"
 
+# Search with relevance filtering (0-1 scale)
+simple-memory search-memory --query "architecture" --min-relevance 0.7
+
 # Search memories from last week
 simple-memory search-memory --query "project" --days-ago 7
 
@@ -193,6 +196,7 @@ Search stored memories by content or tags, with optional time range filtering.
 - `tags` (array, optional) - Filter by tags
 - `limit` (number, optional) - Max results to return (default: 10)
 - `includeRelated` (boolean, optional) - Include related memories (default: false)
+- `minRelevance` (number, optional) - Minimum relevance score (0-1). Filters by BM25 ranking. Higher values (0.7-0.9) return only highly relevant matches. Useful for LLM context loading.
 - `daysAgo` (number, optional) - Filter memories created within last N days (e.g., 7 for last week)
 - `startDate` (string, optional) - Filter memories created on or after this date (ISO 8601: YYYY-MM-DD)
 - `endDate` (string, optional) - Filter memories created on or before this date (ISO 8601: YYYY-MM-DD)
@@ -203,8 +207,20 @@ Search stored memories by content or tags, with optional time range filtering.
   "query": "TypeScript",
   "tags": ["coding"],
   "limit": 5,
-  "daysAgo": 7
+  "minRelevance": 0.7
 }
+```
+
+**Relevance Filtering Examples:**
+```json
+// High precision - only highly relevant results (best for LLM context)
+{ "query": "architecture decisions", "minRelevance": 0.8 }
+
+// Medium precision - moderately relevant results
+{ "query": "bug fixes", "minRelevance": 0.5 }
+
+// No filter - all matches ranked by relevance (default)
+{ "query": "typescript" }
 ```
 
 **Time Range Examples:**

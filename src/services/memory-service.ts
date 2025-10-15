@@ -360,9 +360,14 @@ export class MemoryService {
     
     if (daysAgo !== undefined && daysAgo >= 0) {
       // Convert daysAgo to a start date (N days ago from now)
-      minDate = new Date();
-      minDate.setDate(minDate.getDate() - daysAgo);
-      minDate.setHours(0, 0, 0, 0); // Start of day
+      // Use UTC to match how SQLite stores timestamps
+      const now = new Date();
+      minDate = new Date(Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate() - daysAgo,
+        0, 0, 0, 0  // Start of day in UTC
+      ));
     }
     
     if (startDate) {
