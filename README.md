@@ -8,6 +8,8 @@ A blazingly fast Model Context Protocol (MCP) server for persistent memory stora
 
 Perfect for AI assistants that need to remember context across conversations, store project notes, or build a personal knowledge base.
 
+> 📚 **New to Simple Memory?** Read the [Design Philosophy](docs/DESIGN_PHILOSOPHY.md) to understand why it's built this way, the trade-offs made, and when this approach makes sense for your needs.
+
 ---
 
 ## ✨ Features

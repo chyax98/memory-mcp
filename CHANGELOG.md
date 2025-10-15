@@ -8,18 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Export/Import System**: Backup and restore memories across machines
+  - `export-memory` command - Export memories to JSON with optional filtering
+  - `import-memory` command - Import memories with duplicate detection
+  - Supports tag filtering, date ranges, and limit parameters
+  - Preserves timestamps and relationships
+  - Dry-run mode for preview before import
+  
 - **Automated VS Code Setup**: One-command installation with automatic configuration
   - `npm run setup` command that handles install, build, link, and VS Code config
   - Automatic detection of VS Code stable and Insiders
   - Smart detection of `mcp.json` format (supports both `servers` and `mcpServers` properties)
   - Cross-platform support (Windows, macOS, Linux)
   - No manual configuration needed for VS Code users
-
-- **Improved Build System**: Separated dev and release builds
-  - `npm run build` - Fast development build (no version bump)
-  - `npm run build:release` - Release build with automatic version bump
-  - Prevents version spam during development
-  - Cleaner version history
 
 - **Time Range Search**: Filter memories by creation date
   - `daysAgo` parameter - Search memories from last N days (e.g., 7 for last week)
@@ -28,19 +29,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Works with content search, tag search, and combined queries
   - Supports both relative (daysAgo) and absolute (startDate/endDate) time filtering
 
-- **Backup Statistics**: Memory stats now includes backup information when configured
-  - Backup enabled status
-  - Backup path location
-  - Number of backup files
-  - Minutes since last backup
-  - Minutes until next backup
+- **Auto-Capture Mode**: LLM proactively stores important information
+  - Enhanced tool descriptions guide LLM to capture preferences, decisions, and facts automatically
+  - Stores silently without announcing to user
+  - Proactive search at conversation start for context-aware responses
+  - Real-world usage examples in documentation
+
+- **Backup System**: Lazy backup with cloud storage compatibility
+  - Optional automatic backups with configurable interval
+  - Lazy backup strategy (only after write operations)
+  - Throttled backups (respects minimum interval)
+  - Cloud-safe mode for OneDrive/Dropbox (disables WAL)
+  - Backup statistics in `memory-stats`
+
+- **Relevance Filtering**: Precision control for search results
+  - `minRelevance` parameter (0-1 scale) for filtering by BM25 score
+  - High precision mode (0.7-0.9) for LLM context loading
+  - Ranked results by relevance score
+  - Useful for reducing noise in large memory sets
+
+### Changed
+- **Improved Build System**: Separated dev and release builds
+  - `npm run build` - Fast development build (no version bump)
+  - `npm run build:release` - Release build with automatic version bump
+  - Prevents version spam during development
   
-- **Enhanced Documentation**: Comprehensive README improvements
-  - Performance metrics table with throughput
-  - Cloud storage best practices integrated
-  - Clear installation options (npm vs development)
-  - Backup configuration examples
-  - Real-world usage examples
+- **Enhanced Documentation**: 
+  - Design Philosophy document explaining trade-offs and limitations
+  - Performance benchmarks document with detailed analysis
+  - Stress test suite with comprehensive README
+  - Real-world usage examples for AI assistants
+  - Cloud storage best practices integrated into main README
+
+### Fixed
+- Full-text search now properly handles hyphenated terms
+- Fresh database initialization no longer creates unnecessary backups
+- Improved CLI argument parsing consistency across all commands
+- Better debug logging with hash formatting utilities
 
 ---
 
@@ -50,7 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial release
 - Basic memory storage with SQLite
 - Full-text search with FTS5
-- Tag-based filtering (comma-separated in single column)
+- Tag-based filtering
 - Command-line interface
 - MCP server implementation
 - Relationship support between memories
@@ -61,55 +86,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Delete by hash or tag
 - Memory statistics
 - Automatic relationship detection
-
----
-
-## Migration Guide v1.x → v2.0
-
-### Upgrading
-
-No action required! Simply update to v2.0 and run as normal. The migration system will:
-
-1. **Detect** old schema automatically
-2. **Create** backup of your database
-3. **Apply** migrations in a transaction
-4. **Verify** data integrity
-5. **Complete** in under 50ms
-
-### What Changes
-
-**User-Visible:**
-- ✅ Dramatically faster tag searches (50-200x)
-- ✅ Sub-millisecond operations across the board
-- ✅ Higher throughput (2,000-10,000 ops/sec)
-
-**Under the Hood:**
-- ✅ Normalized tag storage
-- ✅ 7 new performance indexes
-- ✅ Updated FTS table schema
-- ✅ Transaction-based bulk operations
-- ✅ Optimized SQLite pragmas
-
-**Your Code:**
-- ✅ No changes needed - 100% backward compatible
-- ✅ All APIs work exactly the same
-- ✅ No configuration changes required
-
-### Rollback
-
-If you need to rollback (unlikely):
-
-1. Stop the server
-2. Find the backup file: `memory.db.backup-[timestamp]`
-3. Restore: `cp memory.db.backup-[timestamp] memory.db`
-4. Use v1.x version of the server
-
-### Performance Expectations
-
-After upgrading, expect:
-- Tag searches: 50-200x faster
-- Storage operations: 18-49x faster than targets
-- FTS searches: 714-1000x faster than targets
-- Bulk relationships: 10-50x faster
-
-No configuration changes needed - performance improvements are automatic!
