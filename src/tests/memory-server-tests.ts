@@ -196,7 +196,20 @@ async function testMemoryStats(): Promise<void> {
     throw new Error(`Expected at least 5 memories, got ${output.totalMemories}`);
   }
 
+  // Verify MCP config paths are included
+  if (!output.mcpConfigPaths || !Array.isArray(output.mcpConfigPaths)) {
+    throw new Error('Memory stats did not include mcpConfigPaths');
+  }
+
+  // Verify each path has the expected structure
+  for (const configPath of output.mcpConfigPaths) {
+    if (!configPath.name || !configPath.path || typeof configPath.exists !== 'boolean') {
+      throw new Error('MCP config path missing required fields');
+    }
+  }
+
   console.log(`✓ Database contains ${output.totalMemories} memories, ${output.totalRelationships} relationships`);
+  console.log(`✓ Found ${output.mcpConfigPaths.length} MCP config paths`);
 }
 
 /**

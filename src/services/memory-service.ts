@@ -9,6 +9,7 @@ import { debugLog, debugLogHash } from '../utils/debug.js';
 import { runMigrations } from './migrations.js';
 import { DatabaseOptimizer } from './database-optimizer.js';
 import { BackupService, BackupConfig } from './backup-service.js';
+import { getMCPConfigPaths } from '../utils/mcp-config.js';
 import type { ExportFilters, ImportOptions, ImportResult, ExportFormat, ExportedMemory } from '../types/tools.js';
 
 // Get package version for export metadata
@@ -40,6 +41,12 @@ export interface MemoryRelationship {
   createdAt: string;
 }
 
+export interface MCPConfigPath {
+  name: string;
+  path: string;
+  exists: boolean;
+}
+
 export interface MemoryStats {
   version: string; // simple-memory-mcp version
   totalMemories: number;
@@ -53,6 +60,7 @@ export interface MemoryStats {
   backupCount?: number;
   lastBackupAge?: number; // minutes since last backup
   nextBackupIn?: number; // minutes until next backup (-1 if will backup on next write)
+  mcpConfigPaths?: MCPConfigPath[]; // MCP configuration file paths
 }
 
 /**
@@ -694,6 +702,9 @@ export class MemoryService {
         stats.nextBackupIn = -1; // Will backup on every write
       }
     }
+
+    // Add MCP configuration file paths
+    stats.mcpConfigPaths = getMCPConfigPaths();
 
     debugLog('MemoryService: Stats:', stats);
     return stats;
