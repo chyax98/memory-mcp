@@ -86,6 +86,30 @@ button:disabled {
     cursor: not-allowed;
 }
 
+.export-btn, .import-btn {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+    display: inline-block;
+}
+
+.export-btn:hover, .import-btn:hover {
+    background: #218838;
+    transform: translateY(-1px);
+}
+
+.export-btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    transform: none;
+}
+
 .tag-cloud {
     display: flex;
     flex-wrap: wrap;

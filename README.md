@@ -126,6 +126,28 @@ The server exposes tools that your AI assistant can use directly. Once configure
 
 The assistant stores memories silently and retrieves them when relevant, creating a seamless conversation experience.
 
+### Web UI Browser
+
+Browse and manage your memories with a simple web interface:
+
+```bash
+npm run web
+# Opens browser at http://localhost:3000
+```
+
+**Features:**
+- 🔍 **Search & Filter** - Find memories by content or tags
+- 📊 **Tag Cloud** - Visual overview of your most-used tags
+- 📥 **Export** - Download memories as JSON (current view or filtered)
+- 📤 **Import** - Upload and merge memories from JSON files
+- 👁️ **Preview** - View full memory details in modal
+
+**Perfect for:**
+- Reviewing what you've stored before sharing
+- Exporting memories for backup or team sharing
+- Importing memories from colleagues
+- Quick visual search and discovery
+
 ### Command Line Interface
 
 You can also use the CLI directly:
@@ -145,6 +167,12 @@ simple-memory search-memory --query "project" --days-ago 7
 
 # Search memories from specific date range
 simple-memory search-memory --start-date "2025-01-01" --end-date "2025-01-31"
+
+# Export memories to JSON
+simple-memory export-memory --output backup.json --tags "work,important"
+
+# Import memories from JSON
+simple-memory import-memory --input backup.json --skip-duplicates
 
 # View statistics
 simple-memory memory-stats

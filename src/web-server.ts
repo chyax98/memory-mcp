@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 
 import { createServer, IncomingMessage, ServerResponse } from 'http';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { tmpdir } from 'os';
 import { MemoryService } from './services/memory-service.js';
+import { execute as executeExport } from './tools/export-memory/executor.js';
+import { execute as executeImport } from './tools/import-memory/executor.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -173,6 +176,88 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
           });
         } catch (error: any) {
           sendError(res, `Search failed: ${error.message}`, 500);
+        }
+        return;
+      }
+
+      // POST /api/export - Export memories to JSON
+      if (pathWithoutQuery === '/export' && req.method === 'POST') {
+        try {
+          let body = '';
+          req.on('data', chunk => { body += chunk.toString(); });
+          req.on('end', async () => {
+            try {
+              const params = JSON.parse(body || '{}');
+              const { tags, limit, daysAgo, startDate, endDate } = params;
+              
+              // Create temp file for export
+              const tmpDir = join(tmpdir(), 'memory-exports');
+              if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
+              const exportPath = join(tmpDir, `export-${Date.now()}.json`);
+              
+              // Execute export using existing tool
+              const result = await executeExport(
+                { output: exportPath, tags, limit, daysAgo, startDate, endDate },
+                { memoryService, config: {} }
+              );
+              
+              // Read exported file
+              const exportData = readFileSync(exportPath, 'utf-8');
+              
+              sendJSON(res, {
+                success: true,
+                data: JSON.parse(exportData),
+                totalMemories: result.totalMemories
+              });
+            } catch (error: any) {
+              sendError(res, `Export failed: ${error.message}`, 500);
+            }
+          });
+        } catch (error: any) {
+          sendError(res, `Export failed: ${error.message}`, 500);
+        }
+        return;
+      }
+
+      // POST /api/import - Import memories from JSON
+      if (pathWithoutQuery === '/import' && req.method === 'POST') {
+        try {
+          let body = '';
+          req.on('data', chunk => { body += chunk.toString(); });
+          req.on('end', async () => {
+            try {
+              const params = JSON.parse(body || '{}');
+              const { data, skipDuplicates } = params;
+              
+              if (!data) {
+                sendError(res, 'Import data is required', 400);
+                return;
+              }
+              
+              // Create temp file for import
+              const tmpDir = join(tmpdir(), 'memory-imports');
+              if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
+              const importPath = join(tmpDir, `import-${Date.now()}.json`);
+              writeFileSync(importPath, JSON.stringify(data), 'utf-8');
+              
+              // Execute import using existing tool
+              const result = await executeImport(
+                { input: importPath, skipDuplicates: skipDuplicates !== false },
+                { memoryService, config: {} }
+              );
+              
+              sendJSON(res, {
+                success: result.success,
+                imported: result.imported,
+                skipped: result.skipped,
+                errors: result.errors
+              });
+            } catch (error: any) {
+              sendError(res, `Import failed: ${error.message}`, 500);
+            }
+          });
+        } catch (error: any) {
+          sendError(res, `Import failed: ${error.message}`, 500);
         }
         return;
       }

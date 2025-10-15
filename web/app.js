@@ -17,6 +17,8 @@ async function init() {
 function setupEventListeners() {
     document.getElementById('searchBtn').addEventListener('click', handleSearch);
     document.getElementById('clearBtn').addEventListener('click', handleClear);
+    document.getElementById('exportBtn').addEventListener('click', handleExport);
+    document.getElementById('importFile').addEventListener('change', handleImportFile);
     document.getElementById('searchInput').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handleSearch();
     });
@@ -207,6 +209,128 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML.replace(/\n/g, '<br>');
+}
+
+async function handleExport() {
+    try {
+        const exportBtn = document.getElementById('exportBtn');
+        exportBtn.disabled = true;
+        exportBtn.textContent = '⏳ Exporting...';
+        
+        // Build export parameters based on current filters
+        const params = {};
+        
+        if (selectedTag) {
+            params.tags = [selectedTag];
+        }
+        
+        const searchQuery = document.getElementById('searchInput').value.trim();
+        if (searchQuery && !selectedTag) {
+            // For search queries, export all displayed memories by their IDs
+            // This is a limitation - ideally we'd use server-side search
+            params.limit = displayedMemories.length || 100;
+        }
+        
+        const response = await fetch(API_URL + '/export', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        });
+        
+        if (!response.ok) throw new Error('Export failed');
+        
+        const result = await response.json();
+        
+        // Download the exported data
+        const blob = new Blob([JSON.stringify(result.data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `memories-export-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        showSuccess(`Exported ${result.totalMemories} memories`);
+        
+    } catch (error) {
+        showError(`Export failed: ${error.message}`);
+    } finally {
+        const exportBtn = document.getElementById('exportBtn');
+        exportBtn.disabled = false;
+        exportBtn.textContent = '📥 Export';
+    }
+}
+
+async function handleImportFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    try {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const importData = JSON.parse(e.target.result);
+                
+                // Confirm import
+                const confirmed = confirm(
+                    `Import ${importData.totalMemories || 0} memories?\n\n` +
+                    `Duplicates will be skipped automatically.\n\n` +
+                    `Click OK to proceed.`
+                );
+                
+                if (!confirmed) {
+                    event.target.value = ''; // Reset file input
+                    return;
+                }
+                
+                const response = await fetch(API_URL + '/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        data: importData,
+                        skipDuplicates: true 
+                    })
+                });
+                
+                if (!response.ok) throw new Error('Import failed');
+                
+                const result = await response.json();
+                
+                showSuccess(
+                    `Import complete!\n` +
+                    `Imported: ${result.imported}\n` +
+                    `Skipped: ${result.skipped}\n` +
+                    `Errors: ${result.errors.length}`
+                );
+                
+                // Reload memories
+                await loadMemories();
+                
+            } catch (error) {
+                showError(`Import failed: ${error.message}`);
+            }
+        };
+        reader.readAsText(file);
+    } catch (error) {
+        showError(`Failed to read file: ${error.message}`);
+    } finally {
+        event.target.value = ''; // Reset file input
+    }
+}
+
+function showSuccess(message) {
+    const errorDiv = document.getElementById('error');
+    errorDiv.textContent = message;
+    errorDiv.style.background = '#28a745';
+    errorDiv.style.color = 'white';
+    errorDiv.style.display = 'block';
+    setTimeout(() => {
+        errorDiv.style.display = 'none';
+        errorDiv.style.background = '';
+        errorDiv.style.color = '';
+    }, 3000);
 }
 
 // Initialize on load

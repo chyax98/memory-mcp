@@ -32,12 +32,17 @@
     "test:all": "npm run test && npm run test:perf && npm run test:export-import",
     "benchmark": "npm run build && node dist/tests/performance-benchmark.js",
     "link": "npm run build && npm link",
-    "unlink": "npm unlink -g"
+    "unlink": "npm unlink -g",
+    "web": "npm run build && node dist/web-server.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.3",
+    "@octokit/rest": "^22.0.0",
     "better-sqlite3": "^12.2.0",
-    "dotenv": "^16.6.1"
+    "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

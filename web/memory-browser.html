@@ -18,6 +18,11 @@
                 <input type="text" id="searchInput" placeholder="Search memories by content...">
                 <button id="searchBtn">Search</button>
                 <button id="clearBtn">Clear</button>
+                <button id="exportBtn" class="export-btn" title="Export current view to JSON">📥 Export</button>
+                <label for="importFile" class="import-btn" title="Import memories from JSON file">
+                    📤 Import
+                    <input type="file" id="importFile" accept=".json" style="display: none;">
+                </label>
             </div>
             
             <div id="tagCloud" class="tag-cloud"></div>
