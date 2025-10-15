@@ -635,7 +635,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📚 Additional Resources
 
-- [Changelog](CHANGELOG.md) - Version history and changes
+- 🏗️ [Design Philosophy](docs/DESIGN_PHILOSOPHY.md) - Why Simple Memory is built this way, trade-offs, and honest limitations
+- 🚀 [Performance Benchmarks](docs/PERFORMANCE.md) - Detailed performance analysis and optimization insights
+- 📝 [Changelog](CHANGELOG.md) - Version history and changes
 
 ---
 
