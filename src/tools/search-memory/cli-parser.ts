@@ -35,6 +35,11 @@ export function parseCliArgs(args: string[]) {
   if (rawArgs.endDate) {
     result.endDate = rawArgs.endDate as string;
   }
+  if (rawArgs.minRelevance !== undefined) {
+    const relevance = rawArgs.minRelevance as number;
+    // Clamp between 0-1
+    result.minRelevance = Math.min(Math.max(relevance, 0), 1);
+  }
   
   return result;
 }

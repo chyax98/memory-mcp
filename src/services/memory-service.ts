@@ -30,6 +30,7 @@ export interface MemoryEntry {
   tags: string[];
   createdAt: string;
   hash: string;
+  relevance?: number; // BM25 relevance score (0-1), only present when using text search with minRelevance
 }
 
 export interface MemoryRelationship {
@@ -348,7 +349,8 @@ export class MemoryService {
     limit: number = 10,
     daysAgo?: number,
     startDate?: string,
-    endDate?: string
+    endDate?: string,
+    minRelevance?: number
   ): MemoryEntry[] {
     let results: any[];
 
@@ -358,9 +360,14 @@ export class MemoryService {
     
     if (daysAgo !== undefined && daysAgo >= 0) {
       // Convert daysAgo to a start date (N days ago from now)
-      minDate = new Date();
-      minDate.setDate(minDate.getDate() - daysAgo);
-      minDate.setHours(0, 0, 0, 0); // Start of day
+      // Use UTC to match how SQLite stores timestamps
+      const now = new Date();
+      minDate = new Date(Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate() - daysAgo,
+        0, 0, 0, 0  // Start of day in UTC
+      ));
     }
     
     if (startDate) {
@@ -395,7 +402,26 @@ export class MemoryService {
         .map(word => `"${word.replace(/"/g, '""')}"`); // Quote each word for exact word matching
       
       const escapedQuery = words.length > 0 ? words.join(' OR ') : query.replace(/"/g, '""');
-      ftsResults = this.stmts.searchText.all(escapedQuery, limit * 2); // Fetch more to allow for filtering
+      
+      // Fetch more results initially if we need to filter by tags or relevance
+      const fetchLimit = (tags && tags.length > 0) || minRelevance !== undefined ? limit * 5 : limit * 2;
+      ftsResults = this.stmts.searchText.all(escapedQuery, fetchLimit);
+      
+      // Filter by relevance score if threshold provided
+      if (minRelevance !== undefined && ftsResults.length > 0) {
+        // BM25 returns negative scores (more negative = better match)
+        // Normalize to 0-1 range where 1 is best match, 0 is worst
+        const scores = ftsResults.map(r => Math.abs(r.rank));
+        const maxScore = Math.max(...scores);
+        const minScore = Math.min(...scores);
+        const range = maxScore - minScore || 1;
+        
+        ftsResults = ftsResults.filter((row: any) => {
+          const normalizedScore = 1 - ((Math.abs(row.rank) - minScore) / range);
+          row.relevance = normalizedScore; // Store for debugging/display
+          return normalizedScore >= minRelevance;
+        });
+      }
       
       // Hydrate with tags from tags table
       results = ftsResults.map((row: any) => {
@@ -451,7 +477,8 @@ export class MemoryService {
       content: row.content,
       tags: row.tags || [],
       createdAt: row.created_at,
-      hash: row.hash
+      hash: row.hash,
+      ...(row.relevance !== undefined && { relevance: row.relevance })
     }));
 
     debugLog('MemoryService: Search returned', memories.length, 'results');
