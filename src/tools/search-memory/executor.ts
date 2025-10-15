@@ -10,6 +10,7 @@ interface SearchMemoryArgs {
   daysAgo?: number;
   startDate?: string;
   endDate?: string;
+  minRelevance?: number;
 }
 
 interface SearchMemoryResult {
@@ -31,7 +32,8 @@ export async function execute(args: SearchMemoryArgs, context: ToolContext): Pro
     limit,
     args.daysAgo,
     args.startDate,
-    args.endDate
+    args.endDate,
+    args.minRelevance
   );
   const result: SearchMemoryResult = {
     memories,

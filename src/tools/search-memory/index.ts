@@ -59,6 +59,12 @@ Search silently and incorporate findings naturally into responses.`,
         endDate: {
           type: 'string',
           description: 'Filter memories created on or before this date (ISO 8601 format: YYYY-MM-DD or full ISO string).'
+        },
+        minRelevance: {
+          type: 'number',
+          description: 'Minimum relevance score (0-1). Filters results by BM25 ranking. Higher values (e.g., 0.7-0.9) return only highly relevant matches.',
+          minimum: 0,
+          maximum: 1
         }
       }
     }
