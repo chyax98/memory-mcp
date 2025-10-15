@@ -11,6 +11,9 @@ export interface MCPConfigPath {
 /**
  * Get potential MCP configuration file paths for VS Code installations
  * Returns an array of config paths with their existence status
+ * 
+ * Note: Currently detects VS Code and VS Code Insiders. Other variants
+ * like VSCodium, VS Code OSS, or Cursor are not detected.
  */
 export function getMCPConfigPaths(): MCPConfigPath[] {
   const platform = process.platform;

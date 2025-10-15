@@ -9,7 +9,7 @@ import { debugLog, debugLogHash } from '../utils/debug.js';
 import { runMigrations } from './migrations.js';
 import { DatabaseOptimizer } from './database-optimizer.js';
 import { BackupService, BackupConfig } from './backup-service.js';
-import { getMCPConfigPaths } from '../utils/mcp-config.js';
+import { getMCPConfigPaths, type MCPConfigPath } from '../utils/mcp-config.js';
 import type { ExportFilters, ImportOptions, ImportResult, ExportFormat, ExportedMemory } from '../types/tools.js';
 
 // Get package version for export metadata
@@ -39,12 +39,6 @@ export interface MemoryRelationship {
   toMemoryId: number;
   relationshipType: string;
   createdAt: string;
-}
-
-export interface MCPConfigPath {
-  name: string;
-  path: string;
-  exists: boolean;
 }
 
 export interface MemoryStats {
