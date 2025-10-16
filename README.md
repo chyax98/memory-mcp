@@ -470,7 +470,7 @@ The project uses automated version bumping:
 
 The workflow skips version bumps for:
 - Documentation-only changes (`.md` files)
-- Changes to `.github/` directory
+- Changes to `docs/` directory
 - Commits containing `[skip-version]` in the message
 
 ### Testing

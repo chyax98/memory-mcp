@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Automated Version Bumping**: GitHub Actions workflow automatically bumps patch version on every commit/merge to main branch
   - Uses existing `npm run build:release` command
   - Commits changes back to repository with `[skip-version]` tag
-  - Skips markdown and documentation-only changes
+  - Skips documentation-only changes (markdown files and docs directory)
   - Prevents infinite loops with bot detection
 
 - **Export/Import System**: Backup and restore memories across machines
