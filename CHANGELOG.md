@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Automated Version Bumping**: GitHub Actions workflow automatically bumps patch version on every commit/merge to main branch
+  - Uses existing `npm run build:release` command
+  - Commits changes back to repository with `[skip-version]` tag
+  - Skips markdown and documentation-only changes
+  - Prevents infinite loops with bot detection
+
 - **Export/Import System**: Backup and restore memories across machines
   - `export-memory` command - Export memories to JSON with optional filtering
   - `import-memory` command - Import memories with duplicate detection
