@@ -435,6 +435,9 @@ npm run dev
 # Build TypeScript
 npm run build
 
+# Build with version bump (for releases)
+npm run build:release
+
 # Run all tests (28 tests)
 npm run test:all
 
@@ -455,6 +458,20 @@ npm link              # Link current directory globally
 npm unlink -g         # Unlink from global
 simple-memory memory-stats  # Test the global command
 ```
+
+### Versioning
+
+The project uses automated version bumping:
+
+- **Development builds**: Use `npm run build` (no version change)
+- **Release builds**: Use `npm run build:release` (bumps patch version)
+- **Manual version bumps**: Use `npm run version:patch|minor|major`
+- **Automatic**: All commits/merges to `main` automatically bump the patch version via GitHub Actions
+
+The workflow skips version bumps for:
+- Documentation-only changes (`.md` files)
+- Changes to `docs/` directory
+- Commits containing `[skip-version]` in the message
 
 ### Testing
 
