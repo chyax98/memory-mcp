@@ -54,7 +54,7 @@ export interface MemoryStats {
   backupCount?: number;
   lastBackupAge?: number; // minutes since last backup
   nextBackupIn?: number; // minutes until next backup (-1 if will backup on next write)
-  mcpConfigPaths?: MCPConfigPath[]; // MCP configuration file paths
+  mcpConfigPaths?: MCPConfigPath[]; // MCP configuration file paths with matching server entries
 }
 
 /**
@@ -673,7 +673,7 @@ export class MemoryService {
       dbSize: (this.db.pragma('page_size', { simple: true }) as number) * 
               (this.db.pragma('page_count', { simple: true }) as number),
       dbPath: this.dbPath,
-      resolvedPath: this.resolvedDbPath, // Use cached value
+      resolvedPath: this.resolvedDbPath.replace(/\\/g, '/'), // Normalize to forward slashes
       schemaVersion
     };
     
@@ -697,8 +697,8 @@ export class MemoryService {
       }
     }
 
-    // Add MCP configuration file paths
-    stats.mcpConfigPaths = getMCPConfigPaths();
+    // Add MCP configuration file paths (only existing ones)
+    stats.mcpConfigPaths = getMCPConfigPaths().filter(p => p.exists);
 
     debugLog('MemoryService: Stats:', stats);
     return stats;

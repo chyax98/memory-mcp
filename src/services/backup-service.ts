@@ -27,53 +27,63 @@ export class BackupService {
       mkdirSync(this.config.backupPath, { recursive: true });
       debugLog(`Backup directory ready: ${this.config.backupPath}`);
       
-      // Initialize lastBackupTime from most recent backup file (for CLI persistence)
-      this.initializeLastBackupTime();
+      // Load lastBackupTime from metadata file (for CLI persistence)
+      this.lastBackupTime = this.getLastBackupTime();
     } catch (error: any) {
       debugLog(`Warning: Could not create backup directory: ${error.message}`);
     }
   }
 
   /**
-   * Initialize lastBackupTime from the most recent backup file
-   * This allows throttling to work across CLI invocations
+   * Get path to backup metadata file
    */
-  private initializeLastBackupTime(): void {
+  private getMetadataPath(): string {
+    return join(this.config.backupPath, '.backup-metadata.json');
+  }
+
+  /**
+   * Save backup metadata
+   * @returns true if saved successfully, false on error
+   */
+  private saveMetadata(): boolean {
+    try {
+      const metadata = {
+        lastBackupTime: this.lastBackupTime,
+        lastBackupDate: new Date(this.lastBackupTime).toISOString()
+      };
+      const { writeFileSync } = require('fs');
+      writeFileSync(this.getMetadataPath(), JSON.stringify(metadata, null, 2));
+      return true;
+    } catch (error: any) {
+      debugLog(`Warning: Could not save backup metadata: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Get last backup time from metadata file
+   * @returns timestamp in milliseconds, or 0 if no metadata exists
+   */
+  private getLastBackupTime(): number {
     try {
       if (!existsSync(this.config.backupPath)) {
         debugLog(`Backup path does not exist yet: ${this.config.backupPath}`);
-        return;
+        return 0;
       }
 
-      const files = readdirSync(this.config.backupPath)
-        .filter(f => f.endsWith('.db') && f.includes('_auto'))
-        .map(f => {
-          const filePath = join(this.config.backupPath, f);
-          const stats = statSync(filePath);
-          return {
-            name: f,
-            path: filePath,
-            time: stats.mtime.getTime(),
-            mtimeDate: stats.mtime
-          };
-        })
-        .sort((a, b) => b.time - a.time); // Newest first
-
-      if (files.length > 0) {
-        const mostRecent = files[0];
-        this.lastBackupTime = mostRecent.time;
-        const now = Date.now();
-        const ageMinutes = Math.floor((now - this.lastBackupTime) / 60000);
-        debugLog(`📁 Found ${files.length} existing auto backup(s)`);
-        debugLog(`📅 Most recent: ${mostRecent.name}`);
-        debugLog(`🕐 Last backup time: ${new Date(this.lastBackupTime).toISOString()}`);
-        debugLog(`🕐 Current time: ${new Date(now).toISOString()}`);
-        debugLog(`⏱️  Age: ${ageMinutes} minutes (${Math.floor((now - this.lastBackupTime) / 1000)} seconds)`);
+      const metadataPath = this.getMetadataPath();
+      if (existsSync(metadataPath)) {
+        const { readFileSync } = require('fs');
+        const metadata = JSON.parse(readFileSync(metadataPath, 'utf-8'));
+        debugLog(`📋 Loaded backup metadata: last backup at ${metadata.lastBackupDate}`);
+        return metadata.lastBackupTime;
       } else {
-        debugLog(`No existing auto backups found in ${this.config.backupPath}`);
+        debugLog(`📋 No backup metadata found (will create on first backup)`);
+        return 0;
       }
     } catch (error: any) {
-      debugLog(`Warning: Could not initialize last backup time: ${error.message}`);
+      debugLog(`Warning: Could not read last backup time: ${error.message}`);
+      return 0;
     }
   }
 
@@ -117,6 +127,7 @@ export class BackupService {
       }
       
       this.lastBackupTime = Date.now();
+      this.saveMetadata(); // Persist backup time
       debugLog(`✅ Backup created: ${backupPath}`);
 
       // Clean up old backups
@@ -199,6 +210,7 @@ export class BackupService {
 
   /**
    * Clean up old backups, keeping only the most recent N
+   * Uses filename timestamps for reliable ordering
    */
   private cleanupOldBackups(): void {
     if (!this.config.maxBackups || this.config.maxBackups <= 0) {
@@ -210,10 +222,10 @@ export class BackupService {
         .filter(f => f.endsWith('.db'))
         .map(f => ({
           name: f,
-          path: join(this.config.backupPath, f),
-          time: statSync(join(this.config.backupPath, f)).mtime.getTime()
+          path: join(this.config.backupPath, f)
         }))
-        .sort((a, b) => b.time - a.time); // Newest first
+        // Sort by filename (which contains timestamp) - newest first
+        .sort((a, b) => b.name.localeCompare(a.name));
 
       // Delete backups beyond the max count
       const toDelete = files.slice(this.config.maxBackups);

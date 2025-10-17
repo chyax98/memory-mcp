@@ -19,14 +19,14 @@ const MCP_CONFIG_WITH_COMMENTS = `{
   "servers": {
     "simple-memory-mcp": {
       "command": "simple-memory"
-      // 💡 Customize with environment variables:
+      // 💡 Uncomment and customize environment variables as needed:
       // "env": {
-      //   "MEMORY_DB": "/path/to/your/memory.db",
-      //   "MEMORY_BACKUP_PATH": "/path/to/backups",
-      //   "MEMORY_BACKUP_INTERVAL": "1440",
-      //   "DEBUG": "false"
+      //   "MEMORY_DB": "./memory.db",              // Custom database location
+      //   "MEMORY_BACKUP_PATH": "./backups",       // Enable automatic backups
+      //   "MEMORY_BACKUP_INTERVAL": "1440",        // Backup interval in minutes
+      //   "MEMORY_BACKUP_RETENTION": "30",         // Keep backups for N days
+      //   "DEBUG": "false"                         // Enable debug logging
       // }
-      // See README for more options: https://github.com/chrisribe/simple-memory-mcp#configuration
     }
   }
 }`;
@@ -39,8 +39,8 @@ function getVSCodeConfigPaths() {
   if (platform === 'win32') {
     const appData = process.env.APPDATA || join(home, 'AppData', 'Roaming');
     paths.push(
-      { name: 'VS Code', path: join(appData, 'Code', 'User') },
-      { name: 'VS Code Insiders', path: join(appData, 'Code - Insiders', 'User') }
+      { name: 'VS Code', path: join(appData, 'Code', 'User').replace(/\\/g, '/') },
+      { name: 'VS Code Insiders', path: join(appData, 'Code - Insiders', 'User').replace(/\\/g, '/') }
     );
   } else if (platform === 'darwin') {
     const appSupport = join(home, 'Library', 'Application Support');
@@ -99,8 +99,7 @@ function configureVSCode(name, vscodeUserPath) {
   // Check if already configured
   if (mcpConfig[serversProp]['simple-memory-mcp']) {
     console.log(`✅ Already configured in ${name}`);
-    console.log(`   💡 To customize: ${mcpJsonPath}`);
-    return { success: true, reason: 'already-configured', path: mcpJsonPath };
+    return { success: true, reason: 'already-configured', path: mcpJsonPath.replace(/\\/g, '/') };
   }
   
   // Add simple-memory-mcp config
@@ -110,8 +109,7 @@ function configureVSCode(name, vscodeUserPath) {
     mkdirSync(vscodeUserPath, { recursive: true });
     writeFileSync(mcpJsonPath, JSON.stringify(mcpConfig, null, 2), 'utf8');
     console.log(`✅ Added to ${name} mcp.json`);
-    console.log(`   Location: ${mcpJsonPath}`);
-    return { success: true, reason: 'configured', path: mcpJsonPath };
+    return { success: true, reason: 'configured', path: mcpJsonPath.replace(/\\/g, '/') };
   } catch (error) {
     console.error(`❌ Failed to update ${name} mcp.json:`, error.message);
     return { success: false, reason: 'write-error' };
@@ -142,18 +140,24 @@ function main() {
   if (foundCount === 0) {
     console.log('\nℹ️  No VS Code installations detected');
     console.log('   Add this to your VS Code User/mcp.json manually:');
-    console.log(MCP_CONFIG_WITH_COMMENTS);
   } else if (configuredCount > 0) {
     console.log('\n🎉 Configuration complete!');
     console.log('   Restart VS Code and simple-memory-mcp will be available');
-    console.log('\n💡 Customization Tips:');
-    console.log('   • Set custom database location with MEMORY_DB environment variable');
-    console.log('   • Enable automatic backups with MEMORY_BACKUP_PATH');
-    console.log('   • Run multiple instances for work/personal contexts');
-    console.log('   • See README for all configuration options');
-    console.log('\n📖 Configuration docs: https://github.com/chrisribe/simple-memory-mcp#configuration');
   } else {
     console.log('\n✅ All installations already configured');
+  }
+  
+  // Show example config and instructions (for all cases)
+  if (foundCount > 0) {
+    console.log('\n💡 Example configuration with all options:');
+    console.log(MCP_CONFIG_WITH_COMMENTS);
+    console.log('\n💡 To find and edit your config file:');
+    console.log('   Run: node dist/index.js memory-stats');
+    if (configuredCount > 0) {
+      console.log('\n📖 Configuration docs: https://github.com/chrisribe/simple-memory-mcp#configuration');
+    }
+  } else {
+    console.log(MCP_CONFIG_WITH_COMMENTS);
   }
 }
 
