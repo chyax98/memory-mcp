@@ -41,6 +41,8 @@ Perfect for AI assistants that need to remember context across conversations, st
 
 ## 🚀 Quick Start
 
+> 💡 **Best Experience**: Simple Memory works best with **Claude Sonnet in Agent Mode**. The agent's autonomous decision-making and proactive behavior enables optimal memory capture and retrieval without explicit instructions.
+
 ### 1️⃣ One-Command Setup
 
 **From Source:**
