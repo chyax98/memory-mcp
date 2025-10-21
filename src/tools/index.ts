@@ -15,14 +15,15 @@ export class ToolRegistry {
   private tools: Map<string, Tool> = new Map();
 
   constructor() {
-    // Register memory tools
-    this.registerTool(storeMemoryTool);
+    // Register memory tools in order of usage frequency and safety
+    // (search first, delete last to avoid LLM assuming destructive operations)
     this.registerTool(searchMemoryTool);
-    this.registerTool(deleteMemoryTool);
+    this.registerTool(storeMemoryTool);
     this.registerTool(updateMemoryTool);
     this.registerTool(memoryStatsTool);
     this.registerTool(exportMemoryTool);
     this.registerTool(importMemoryTool);
+    this.registerTool(deleteMemoryTool);
   }
 
   private registerTool(tool: Tool): void {
