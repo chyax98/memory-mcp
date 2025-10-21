@@ -196,7 +196,30 @@ async function testMemoryStats(): Promise<void> {
     throw new Error(`Expected at least 5 memories, got ${output.totalMemories}`);
   }
 
+  // Verify MCP config paths are included
+  if (!output.mcpConfigPaths || !Array.isArray(output.mcpConfigPaths)) {
+    throw new Error('Memory stats did not include mcpConfigPaths');
+  }
+
+  // Verify each path has the expected structure
+  for (const configPath of output.mcpConfigPaths) {
+    if (!configPath.name || !configPath.path || typeof configPath.exists !== 'boolean') {
+      throw new Error('MCP config path missing required fields');
+    }
+    // matchingServers is optional, but if present should be an array
+    if (configPath.matchingServers && !Array.isArray(configPath.matchingServers)) {
+      throw new Error('MCP config path matchingServers should be an array');
+    }
+  }
+
   console.log(`✓ Database contains ${output.totalMemories} memories, ${output.totalRelationships} relationships`);
+  console.log(`✓ Found ${output.mcpConfigPaths.length} MCP config paths`);
+  
+  // Show helpful info about matching configs
+  const matching = output.mcpConfigPaths.filter((c: any) => c.matchingServers?.length > 0);
+  if (matching.length > 0) {
+    console.log(`✓ Found ${matching.length} config(s) with matching server entries`);
+  }
 }
 
 /**
